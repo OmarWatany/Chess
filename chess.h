@@ -72,7 +72,7 @@ availableSqs *calcNextMoveKing(Square *);
 bool vsq(Square *, Square *);
 // move functions
 Square *chooseSquare(CHANGE change);
-void moveSldr(Square *, Square *);
+int moveSldr();
 bool isAvailable(Square *);
 void changeActive();
 // displaying functions

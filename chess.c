@@ -1,6 +1,8 @@
 #include "chess.h"
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 Board *gboard;
 availableSqs *available;
@@ -20,7 +22,8 @@ int main() {
 }
 
 void game() {
-  int data, valid;
+  int valid;
+  char data[64];
   Square *choosen;
   bool RUNING_STAT = true;
   CLEAR;
@@ -29,28 +32,22 @@ void game() {
     printf("1. choose soldier");
     printf("\t2. quit\n");
     printf("Enter option : ");
-    valid = scanf("%d", &data);
-    if (!valid)
+    valid = scanf(" %c", data);
+    if (!valid) {
       erroredEnd();
-    switch (data) {
-    case 1:
-      choosen = chooseSquare(FROM);
-
-      destroyAvList(available);
-      available = calcNextMove(choosen);
-      if (available == NULL)
-        erroredEnd();
-
-      displayNextSqsList();
-      Square *next;
-      next = chooseSquare(TO);
-      moveSldr(choosen, next);
-      break;
-    case 2:
-      RUNING_STAT = false;
-      break;
+    } else {
+      switch (data[0]) {
+      case '1':
+        valid = 0;
+        while (!valid)
+          valid = moveSldr();
+        break;
+      case '2':
+        RUNING_STAT = false;
+        break;
+      }
+      CLEAR;
     }
-    CLEAR;
   }
 }
 
@@ -444,8 +441,8 @@ bool vsq(Square *from, Square *to) {
 
 Square *chooseSquare(CHANGE change) {
   int valid, raw;
-  char sq[2], col;
-  Square *s;
+  char sq[64], col;
+
   switch (change) {
   case FROM:
     printf("From : ");
@@ -456,8 +453,11 @@ Square *chooseSquare(CHANGE change) {
   }
 
   valid = scanf("%s", sq);
-  if (!valid)
-    erroredEnd();
+  if (!valid || strlen(sq) > 2) {
+    if (strcmp(sq, "cancel") == 0)
+      return NULL;
+    chooseSquare(change);
+  }
 
   col = sq[0];
   raw = sq[1] - '0';
@@ -470,23 +470,44 @@ Square *chooseSquare(CHANGE change) {
     valid = scanf("%d", &raw);
   }
 
-  s = &(gboard->Squares[8 - raw][(col - 65)]);
-
-  switch (change) {
-  case FROM:
-    if (s->sldr->TEAM->color == ACTIVE) {
-      return s;
-    } else {
-      return chooseSquare(FROM);
-    }
-    break;
-  case TO:
-    return s;
-    break;
-  }
+  return &(gboard->Squares[8 - raw][(col - 65)]);
 }
 
-void moveSldr(Square *from, Square *next) {
+int moveSldr() {
+  destroyAvList(available);
+  Square *from = chooseSquare(FROM);
+
+  if (from == NULL)
+    return 1;
+
+  if (!from->occupied)
+    moveSldr();
+
+  if (from->sldr->TEAM->color != ACTIVE) {
+    switch (ACTIVE) {
+    case WHITE:
+      printf("White change\n");
+      break;
+    case BLACK:
+      printf("Black change\n");
+      break;
+    }
+    chooseSquare(FROM);
+  }
+
+  available = calcNextMove(from);
+  if (available == NULL)
+    erroredEnd();
+
+  if (available->top <= 0) {
+    printf("Can't move\n");
+    return 0;
+  }
+
+  Square *next;
+  displayNextSqsList();
+  next = chooseSquare(TO);
+
   if (isAvailable(next)) {
     switch (from->sldr->NMOVES) {
     case ZERO:
@@ -510,6 +531,7 @@ void moveSldr(Square *from, Square *next) {
     from->sldr = NULL;
     changeActive();
   }
+  return 1;
 }
 
 bool isAvailable(Square *sq) {
@@ -625,6 +647,7 @@ void destroyAvList(availableSqs *st) {
 
 void erroredEnd() {
   destroy();
+  printf("there is an error\n");
   exit(1);
 }
 
