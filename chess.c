@@ -1,5 +1,4 @@
 #include "chess.h"
-#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,10 +8,10 @@ availableSqs *available;
 COLOR ACTIVE;
 
 int main() {
-  // SET_t *white = onlyType(QUEEN, WHITE);
-  // SET_t *black = onlyType(QUEEN, BLACK);
-  SET_t *white = Set(WHITE);
-  SET_t *black = Set(BLACK);
+  SET_t *white = onlyType(QUEEN, WHITE);
+  SET_t *black = onlyType(QUEEN, BLACK);
+  // SET_t *white = Set(WHITE);
+  // SET_t *black = Set(BLACK);
   gboard = createBoard(white, black);
   ACTIVE = WHITE;
 
@@ -39,8 +38,14 @@ void game() {
       switch (data[0]) {
       case '1':
         valid = 0;
-        while (!valid)
+        while (valid != 1) {
           valid = moveSldr();
+          if (valid == 2) {
+            // if canceled don't mirror
+            break;
+          }
+          mirrorBoard();
+        }
         break;
       case '2':
         RUNING_STAT = false;
@@ -123,8 +128,7 @@ SET_t *Set(COLOR color) {
 }
 
 SET_t *onlyType(Soldier_t t, COLOR color) {
-  SET_t *s;
-  s = Set(color);
+  SET_t *s = Set(color);
   for (int i = 0; i < 16; i++) {
     if (s->soldiers[i].type != t) {
       s->soldiers[i].State = DEAD;
@@ -132,6 +136,28 @@ SET_t *onlyType(Soldier_t t, COLOR color) {
     }
   }
   return s;
+}
+
+void mirrorBoard() {
+  Square temp;
+  int colm, row;
+  // mirror the rows
+  for (int i = 0; i < 4; i++) {
+    for (int j = 0; j < 8; j++) {
+      temp = gboard->Squares[7 - i][j];
+      gboard->Squares[7 - i][j] = gboard->Squares[i][j];
+      gboard->Squares[i][j] = temp;
+    }
+  }
+
+  // mirror the columns
+  for (int i = 0; i < 8; i++) {
+    for (int j = 0; j < 4; j++) {
+      temp = gboard->Squares[i][7 - j];
+      gboard->Squares[i][7 - j] = gboard->Squares[i][j];
+      gboard->Squares[i][j] = temp;
+    }
+  }
 }
 
 Board *createBoard(SET_t *white, SET_t *black) {
@@ -182,6 +208,7 @@ Board *createBoard(SET_t *white, SET_t *black) {
 
 availableSqs *calcNextMove(Square *sq) {
   Soldier *sldr = sq->sldr;
+  destroyAvList(available);
   switch (sldr->type) {
   case PAWN:
     return calcNextMovePawn(sq);
@@ -206,8 +233,18 @@ availableSqs *calcNextMove(Square *sq) {
 
 availableSqs *calcNextMovePawn(Square *f) {
   // TODO : calculate es passant
-  availableSqs *nextSqs;
-  int colmn = f->pos.col - 'A', row = 8 - f->pos.row;
+  availableSqs *nextSqs = NULL;
+  int colmn, row;
+  switch (ACTIVE) {
+  case WHITE:
+    colmn = f->pos.col - 'A';
+    row = 8 - f->pos.row;
+    break;
+  case BLACK:
+    colmn = 'H' - f->pos.col;
+    row = f->pos.row - 1;
+    break;
+  }
   // number possible squares
   int praws;
   // check if there is victims in corners or beside him
@@ -220,18 +257,11 @@ availableSqs *calcNextMovePawn(Square *f) {
     praws = 1;
   }
 
-  Square *n;
+  Square *n = NULL;
 
   // check the next rows
   for (int i = 1; i <= praws; i++) {
-    switch (f->sldr->TEAM->color) {
-    case BLACK:
-      n = &(gboard->Squares[row + i][colmn]);
-      break;
-    case WHITE:
-      n = &(gboard->Squares[row - i][colmn]);
-      break;
-    }
+    n = &(gboard->Squares[row - i][colmn]);
     if (vsq(f, n))
       push(nextSqs, n);
   }
@@ -239,11 +269,7 @@ availableSqs *calcNextMovePawn(Square *f) {
   for (int i = -1; i <= 1; i++) {
     if (i == 0)
       continue;
-    if (f->sldr->TEAM->color == BLACK) {
-      n = &(gboard->Squares[row + 1][colmn + i]);
-    } else {
-      n = &(gboard->Squares[row - 1][colmn + i]);
-    }
+    n = &(gboard->Squares[row - 1][colmn + i]);
     if (n->occupied && vsq(f, n))
       push(nextSqs, n);
   }
@@ -253,7 +279,17 @@ availableSqs *calcNextMovePawn(Square *f) {
 
 availableSqs *calcNextMoveKnight(Square *f) {
   availableSqs *nextSqs;
-  int colmn = f->pos.col - 'A', row = 8 - f->pos.row;
+  int colmn, row;
+  switch (ACTIVE) {
+  case WHITE:
+    colmn = f->pos.col - 'A';
+    row = 8 - f->pos.row;
+    break;
+  case BLACK:
+    colmn = 'H' - f->pos.col;
+    row = f->pos.row - 1;
+    break;
+  }
   nextSqs = dlist(8);
 
   // set boundries
@@ -273,7 +309,7 @@ availableSqs *calcNextMoveKnight(Square *f) {
     rb2 = 7 - row;
   }
 
-  Square *n;
+  Square *n = NULL;
   for (int col = cb1; col <= cb2; col++) {
     if (col == 0)
       continue;
@@ -294,112 +330,145 @@ availableSqs *calcNextMoveKnight(Square *f) {
 }
 
 availableSqs *calcNextMoveRook(Square *f) {
-  int colmn = f->pos.col - 'A', row = 8 - f->pos.row;
-  int b1 = 0, b2 = 7;
+  int colmn, row;
+  switch (ACTIVE) {
+  case WHITE:
+    colmn = f->pos.col - 'A';
+    row = 8 - f->pos.row;
+    break;
+  case BLACK:
+    colmn = 'H' - f->pos.col;
+    row = f->pos.row - 1;
+    break;
+  }
+
+  // available squares before and after.
+  int abc = colmn, afc = 7 - colmn;
+  int abr = row, afr = 7 - row;
+  int before, after;
 
   availableSqs *nextSqs;
   nextSqs = dlist(15);
 
-  Square *n;
+  Square *n = NULL;
 
-  for (int c = colmn + 1; c <= 7; c++) {
-    n = &(gboard->Squares[row][c]);
-    if (!n->occupied && vsq(f, n)) {
-      push(nextSqs, n);
-    } else if (vsq(f, n) && n->occupied) {
-      push(nextSqs, n);
-      break;
-    } else
-      break;
+  after = before = colmn;
+  for (int i = 1; i <= MAX(abc, afc); i++) {
+    after++;
+    if (after <= 7) {
+      n = &(gboard->Squares[row][after]);
+      if (!n->occupied) {
+        push(nextSqs, n);
+      } else if (vsq(f, n)) {
+        push(nextSqs, n);
+        after = 8;
+      }
+    }
+    before--;
+    if (before >= 0) {
+      n = &(gboard->Squares[row][before]);
+      if (!n->occupied) {
+        push(nextSqs, n);
+      } else if (vsq(f, n)) {
+        push(nextSqs, n);
+        before = -1;
+      }
+    }
   }
 
-  for (int c = colmn - 1; c >= b1; c--) {
-    n = &(gboard->Squares[row][c]);
-    if (!n->occupied && vsq(f, n)) {
-      push(nextSqs, n);
-    } else if (vsq(f, n) && n->occupied) {
-      push(nextSqs, n);
-      break;
-    } else
-      break;
-  }
-
-  for (int r = row + 1; r <= b2; r++) {
-    n = &(gboard->Squares[r][colmn]);
-    if (!n->occupied && vsq(f, n)) {
-      push(nextSqs, n);
-    } else if (vsq(f, n) && n->occupied) {
-      push(nextSqs, n);
-      break;
-    } else
-      break;
-  }
-
-  for (int r = row - 1; r >= b1; r--) {
-    n = &(gboard->Squares[r][colmn]);
-    if (!n->occupied && vsq(f, n)) {
-      push(nextSqs, n);
-    } else if (vsq(f, n) && n->occupied) {
-      push(nextSqs, n);
-      break;
-    } else
-      break;
+  after = before = row;
+  for (int i = 1; i <= MAX(abr, afr); i++) {
+    after++;
+    if (after <= 7) {
+      n = &(gboard->Squares[after][colmn]);
+      if (!n->occupied) {
+        push(nextSqs, n);
+      } else if (vsq(f, n)) {
+        push(nextSqs, n);
+        after = 8;
+      }
+    }
+    before--;
+    if (before >= 0) {
+      n = &(gboard->Squares[before][colmn]);
+      if (!n->occupied) {
+        push(nextSqs, n);
+      } else if (vsq(f, n)) {
+        push(nextSqs, n);
+        before = -1;
+      }
+    }
   }
 
   return nextSqs;
 }
 
 availableSqs *calcNextMoveBishop(Square *f) {
-  int colmn = f->pos.col - 'A', row = 8 - f->pos.row;
-  int b1 = 0, b2 = 7;
+  int colmn, row;
+  switch (ACTIVE) {
+  case WHITE:
+    colmn = f->pos.col - 'A';
+    row = 8 - f->pos.row;
+    break;
+  case BLACK:
+    colmn = 'H' - f->pos.col;
+    row = f->pos.row - 1;
+    break;
+  }
+  int rbefore = 0, rafter = 0;
+  int cbefore = 0, cafter = 0;
 
   availableSqs *nextSqs;
   nextSqs = dlist(15);
 
-  Square *n;
+  Square *n = NULL;
 
-  for (int i = 1; colmn + i <= 7 && row - i >= 0; i++) {
-    n = &(gboard->Squares[row - i][colmn + i]);
-    if (!n->occupied && vsq(f, n)) {
-      push(nextSqs, n);
-    } else if (vsq(f, n) && n->occupied) {
-      push(nextSqs, n);
-      break;
-    } else
-      break;
-  }
+  for (int i = 1; i <= MAX(MAX(row, 7 - row), MAX(colmn, 7 - colmn)); i++) {
+    cafter = colmn + i, cbefore = colmn - i;
+    rafter = row + i, rbefore = row - i;
 
-  for (int i = 1; colmn + i <= 7 && row + i <= 7; i++) {
-    n = &(gboard->Squares[row + i][colmn + i]);
-    if (!n->occupied && vsq(f, n)) {
-      push(nextSqs, n);
-    } else if (vsq(f, n) && n->occupied) {
-      push(nextSqs, n);
-      break;
-    } else
-      break;
-  }
+    if (cafter <= 7 && rafter <= i) {
+      n = &(gboard->Squares[rafter][cafter]);
+      if (!n->occupied) {
+        push(nextSqs, n);
+      } else if (vsq(f, n)) {
+        push(nextSqs, n);
+        cafter = rafter = 8;
+      }
+    }
 
-  for (int i = 1; colmn - i >= 0 && row + i <= 7; i++) {
-    n = &(gboard->Squares[row + i][colmn - i]);
-    if (!n->occupied && vsq(f, n)) {
-      push(nextSqs, n);
-    } else if (vsq(f, n) && n->occupied) {
-      push(nextSqs, n);
-      break;
-    } else
-      break;
-  }
+    if (cbefore >= 0 && rbefore >= 0) {
+      n = &(gboard->Squares[rbefore][cbefore]);
+      if (!n->occupied) {
+        push(nextSqs, n);
+      } else if (vsq(f, n)) {
+        push(nextSqs, n);
+        cbefore = -1;
+        rbefore = -1;
+      }
+    }
 
-  for (int i = 1; colmn - i >= 0 && row - i >= 0; i++) {
-    n = &(gboard->Squares[row - i][colmn - i]);
-    if (!n->occupied && vsq(f, n)) {
-      push(nextSqs, n);
-    } else if (vsq(f, n) && n->occupied) {
-      push(nextSqs, n);
-      break;
-    } else
-      break;
+    if (cbefore >= 0 && rafter <= 7) {
+      n = &(gboard->Squares[rafter][cbefore]);
+      if (!n->occupied) {
+        push(nextSqs, n);
+      } else if (vsq(f, n)) {
+        push(nextSqs, n);
+        cbefore = -1;
+        rbefore = -1;
+      }
+    }
+
+    if (rbefore >= 0 && cafter <= 7) {
+      n = &(gboard->Squares[rbefore][cafter]);
+      if (!n->occupied) {
+        push(nextSqs, n);
+      } else if (vsq(f, n)) {
+        push(nextSqs, n);
+        cbefore = -1;
+        rbefore = -1;
+      }
+    }
   }
 
   return nextSqs;
@@ -407,8 +476,8 @@ availableSqs *calcNextMoveBishop(Square *f) {
 
 availableSqs *calcNextMoveQueen(Square *f) {
 
-  availableSqs *first = calcNextMoveBishop(f);
-  availableSqs *second = calcNextMoveRook(f);
+  availableSqs *second = calcNextMoveBishop(f);
+  availableSqs *first = calcNextMoveRook(f);
   availableSqs *nextSqs = mergeList(first, second);
   // number possible squares
   return nextSqs;
@@ -417,7 +486,17 @@ availableSqs *calcNextMoveQueen(Square *f) {
 availableSqs *calcNextMoveKing(Square *f) {
   availableSqs *nextSqs;
   Square *n;
-  int colmn = f->pos.col - 'A', row = 8 - f->pos.row;
+  int colmn, row;
+  switch (ACTIVE) {
+  case WHITE:
+    colmn = f->pos.col - 'A';
+    row = 8 - f->pos.row;
+    break;
+  case BLACK:
+    colmn = 'H' - f->pos.col;
+    row = f->pos.row - 1;
+    break;
+  }
   for (int c = -1; c <= 1; c++) {
     for (int r = -1; r <= 1; r++) {
       n = &(gboard->Squares[row + r][colmn + c]);
@@ -455,7 +534,7 @@ Square *chooseSquare(CHANGE change) {
   valid = scanf("%s", sq);
   if (!valid || strlen(sq) > 2) {
     if (strcmp(sq, "cancel") == 0)
-      return NULL;
+      return 0;
     chooseSquare(change);
   }
 
@@ -470,18 +549,24 @@ Square *chooseSquare(CHANGE change) {
     valid = scanf("%d", &raw);
   }
 
-  return &(gboard->Squares[8 - raw][(col - 65)]);
+  switch (ACTIVE) {
+  case WHITE:
+    return &(gboard->Squares[8 - raw][(col - 65)]);
+    break;
+  case BLACK:
+    return &(gboard->Squares[raw - 1]['H' - col]);
+    break;
+  }
 }
 
 int moveSldr() {
-  destroyAvList(available);
   Square *from = chooseSquare(FROM);
 
-  if (from == NULL)
-    return 1;
+  if (from == 0)
+    return 2;
 
   if (!from->occupied)
-    moveSldr();
+    return moveSldr();
 
   if (from->sldr->TEAM->color != ACTIVE) {
     switch (ACTIVE) {
@@ -492,7 +577,7 @@ int moveSldr() {
       printf("Black change\n");
       break;
     }
-    chooseSquare(FROM);
+    return moveSldr();
   }
 
   available = calcNextMove(from);
@@ -504,9 +589,10 @@ int moveSldr() {
     return 0;
   }
 
-  Square *next;
   displayNextSqsList();
-  next = chooseSquare(TO);
+  Square *next = chooseSquare(TO);
+  if (next == 0)
+    return 2;
 
   if (isAvailable(next)) {
     switch (from->sldr->NMOVES) {
@@ -530,14 +616,17 @@ int moveSldr() {
     next->occupied = true;
     from->sldr = NULL;
     changeActive();
+    return 1;
   }
-  return 1;
+  return 2;
 }
 
 bool isAvailable(Square *sq) {
-  for (int i = 0; i < available->count; i++) {
-    if (sq == available->stack[i]) {
-      return true;
+  if (available != NULL) {
+    for (int i = 0; i < available->count; i++) {
+      if (sq == available->stack[i]) {
+        return true;
+      }
     }
   }
   return false;
@@ -548,12 +637,14 @@ void changeActive() { ACTIVE = !ACTIVE; }
 
 void drawBoard() {
   // draw gboard squares and soldiers
+  //
   printf("   \033[;31m%s  soldiers count : %d\033[;0m\n", "BLACK",
          gboard->sets[0]->count);
   for (int i = 0; i < 8; i++) {
-    printf("%d  ", 8 - i);
+    printf("%d  ", gboard->Squares[i][0].pos.row);
     for (int j = 0; j < 8; j++) {
       displaySq(&gboard->Squares[i][j]);
+      // displaySqPosition(&gboard->Squares[i][j]);
     }
     printf("\n");
   }
@@ -561,6 +652,7 @@ void drawBoard() {
   printf(" ");
   for (int i = 0; i < 8; i++) {
     printf(" %2c ", gboard->Squares[0][i].pos.col);
+    // printf(" %2c ", 'A' + i);
   }
   printf("\n");
   printf("   WHITE  soldiers count : %d\n", gboard->sets[1]->count);
@@ -578,12 +670,14 @@ void displaySq(Square *sq) {
 }
 
 void displaySqPosition(Square *sq) {
-  printf("%c%d ", sq->pos.col, sq->pos.row);
+  printf("%c%d  ", sq->pos.col, sq->pos.row);
 }
 
 void displayNextSqsList() {
-  for (int i = 0; i < available->top; i++) {
-    displaySqPosition(available->stack[i]);
+  for (int i = 1; i <= available->top; i++) {
+    displaySqPosition(available->stack[i - 1]);
+    if (i % 7 == 0)
+      printf("\n");
   }
   printf("\n");
 }
@@ -598,12 +692,11 @@ availableSqs *dlist(unsigned int size) {
 
 void push(availableSqs *st, Square *sq) {
 
-  if (st->top == st->count) {
+  if (st->top == st->count - 1) {
     stackResize(st, 5);
-  } else {
-    st->stack[st->top] = sq;
-    st->top += 1;
   }
+  st->stack[st->top] = sq;
+  st->top += 1;
 }
 
 void stackResize(availableSqs *st, int size) {
@@ -641,7 +734,7 @@ void destroyAvList(availableSqs *st) {
   if (st != NULL) {
     free(st->stack);
     free(st);
-    st = NULL;
+    // st = NULL;
   }
 }
 
@@ -655,7 +748,7 @@ availableSqs *mergeList(availableSqs *first, availableSqs *second) {
   availableSqs *nextSqs;
   nextSqs = first;
   for (int i = 0; i < second->top; i++) {
-    push(nextSqs, second->stack[i]);
+    push(first, second->stack[i]);
   }
   destroyAvList(second);
   return nextSqs;

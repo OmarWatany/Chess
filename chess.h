@@ -12,6 +12,7 @@
 #endif
 
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
+#define MAX(x, y) ((x) > (y) ? (x) : (y))
 
 typedef enum { LIVE, DEAD } SOLDIER_STATE;
 typedef enum { WHITE, BLACK } COLOR;
@@ -93,3 +94,4 @@ void destroyAvList(availableSqs *);
 // for testing
 //
 SET_t *onlyType(Soldier_t t, COLOR color);
+void mirrorBoard();
