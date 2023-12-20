@@ -70,7 +70,7 @@ availableSqs *calcNextMoveRook(Square *);
 availableSqs *calcNextMoveBishop(Square *);
 availableSqs *calcNextMoveQueen(Square *);
 availableSqs *calcNextMoveKing(Square *);
-bool vsq(Square *, Square *);
+bool isEnemy(Square *, Square *);
 // move functions
 Square *chooseSquare(CHANGE change);
 int moveSldr();
@@ -95,3 +95,7 @@ void destroyAvList(availableSqs *);
 //
 SET_t *onlyType(Soldier_t t, COLOR color);
 void mirrorBoard();
+void colorBoardSquares();
+bool inBound(int);
+void setPos(Square *, int *, int *);
+char **initColor();
