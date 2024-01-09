@@ -44,16 +44,16 @@ typedef struct {
 } Soldier;
 
 struct Set_t {
-    COLOR color;
     Soldier *soldiers;
     unsigned int count;
+    COLOR color;
 };
 // set struct
 
 typedef struct {
     Soldier *sldr;
-    bool occupied;
     char *color;
+    bool occupied;
 } Square;
 
 typedef struct {
@@ -71,8 +71,8 @@ typedef struct {
 typedef struct {
     Board *board;
     availableSqs *available;
-    COLOR ACTIVE;
     char **colors;
+    COLOR ACTIVE;
 } Data;
 
 void game();

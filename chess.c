@@ -5,10 +5,8 @@
 
 Data *gdata;
 void debug() {
-    printf("%ld\n", sizeof(NM_OF_MOVES));
-    printf("%ld\n", sizeof(*gdata->board->sets[0]->soldiers[8].otherdt));
-    printf("%ld\n", sizeof(gdata->board->sets[0]->soldiers[8].otherdt->enpassant));
-    printf("%ld\n", sizeof(bool));
+    printf("%ld\n", sizeof(Data));
+    ;
 }
 
 int main() {
