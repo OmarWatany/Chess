@@ -1,81 +1,134 @@
-#include "./data.h"
+#include "./chess.h"
+#include "data.h"
+#include "raylib.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-Data *gdata;
-void debug() {
-    printf("%ld\n", sizeof(Data));
-    ;
-}
+globalData *gdata;
 
 int main() {
-    char data[64];
     initgdata();
 
-    CLEAR;
-    printf("1. Start New Game\n");
-    printf("2. Resume\n");
-    printf("3. Cancel\n");
-    printf("Enter option : ");
-    if (!scanf(" %s", data))
-        erroredEnd();
-    switch (data[0]) {
-    case '1':
-        game();
-        save(gdata);
-        break;
-    case '2':
-        load(gdata);
-        game();
-        save(gdata);
-        break;
-    case '3':
-        break;
-    case 'd':
-        debug();
-        break;
-    default:
-        break;
-    }
+    game();
 
     destroydata();
     return 0;
 }
 
 void game() {
-    int valid;
-    char data[64];
-    bool RUNING_STAT = true;
-    // CLEAR;
-    while (RUNING_STAT) {
+    int valid = 0;
+    while (!WindowShouldClose()) {
+        valid = 0;
+        ClearBackground(BROWN);
+        BeginDrawing();
         drawBoard();
-        printf("1. choose soldier");
-        printf("\t2. quit\n");
-        printf("Enter option : ");
-        if (!scanf(" %s", data))
-            erroredEnd();
 
-        switch (data[0]) {
-        case '1':
-            valid = 0;
-            while (valid != 1) {
-                valid = moveSldr();
-                drawBoard();
-                if (valid == 2)
-                    break; // if canceled don't mirror
-                mirrorBoard(gdata->board);
-            }
+        if (IsKeyReleased(KEY_Q)) {
             break;
-        case '2':
-            RUNING_STAT = false;
-            break;
-        default:
-            continue;
-            break;
+        } else if (IsKeyReleased(KEY_F)) {
+            ToggleFullscreen();
         }
-        CLEAR;
+        if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+            Position pos = getPos();
+            valid = moveSldr(pos);
+            if (valid == 1)
+                mirrorBoard();
+        }
+
+        EndDrawing();
     }
+}
+
+int moveSldr(Position pos) {
+    // printf("row %d\n", pos.row);
+
+    Square **from = &gdata->fromSquare, *next;
+    switch (gdata->movementChange) {
+    case FROM:
+        (*from) = chooseSquare(pos);
+        if (!(*from)->occupied) {
+            return 0;
+        }
+        // if choosed non active team's soldier
+        if ((*from)->sldr->TEAM->color != gdata->ACTIVE) {
+            colorBoardSquares();
+            return 0;
+        }
+        gdata->available = calcNextMove(*from);
+        if (gdata->available == NULL || gdata->available->top <= 0) {
+            colorBoardSquares();
+            return moveSldr(pos);
+        }
+        gdata->movementChange = TO;
+        return 2;
+    case TO:
+        next = chooseSquare(pos);
+        if (next->occupied && next->sldr->TEAM->color == gdata->ACTIVE) {
+            gdata->movementChange = FROM;
+            colorBoardSquares();
+            return moveSldr(pos);
+        }
+        if (isAvailable(next)) {
+            // if he is going to kill an enemy
+            if (next->occupied) {
+                killEnemey(next->sldr);
+            }
+
+            if ((*from)->sldr->type == PAWN) {
+                for (int i = 0; i < 8; i++) {
+                    if (gdata->board->sets[1]->soldiers[i].otherdt->enpassant)
+                        gdata->board->sets[1]->soldiers[i].otherdt->enpassant =
+                            false;
+                    if (gdata->board->sets[0]->soldiers[i + 8].otherdt->enpassant)
+                        gdata->board->sets[0]->soldiers[i + 8].otherdt->enpassant =
+                            false;
+                }
+
+                if (pos.row == 4 && (*from)->sldr->otherdt->NMOVES == ZERO) {
+                    (*from)->sldr->otherdt->enpassant = true;
+                }
+
+                if ((*from)->sldr->otherdt->NMOVES < MORE_THAN_ONE)
+                    ((*from)->sldr->otherdt->NMOVES)++;
+
+                if (pos.row == 2 && pos.col != (*from)->sldr->pos.col) {
+                    killEnemey(
+                        gdata->board->Squares[(*from)->sldr->pos.row][pos.col].sldr);
+                    gdata->board->Squares[(*from)->sldr->pos.row][pos.col].occupied =
+                        false;
+                }
+            }
+
+            (*from)->occupied = false;
+            next->sldr = (*from)->sldr;
+            next->occupied = true;
+            (*from)->sldr = NULL;
+            next->sldr->pos = pos;
+            gdata->movementChange = FROM;
+            colorBoardSquares();
+            changeActive();
+            return 1;
+        }
+    }
+    return 0;
+}
+
+void killEnemey(Soldier *sldr) {
+    sldr->State = DEAD;
+    sldr->TEAM->count--;
+}
+
+Position getPos() {
+    Vector2 mouse = GetMousePosition();
+    Position pos = {10, 10};
+    pos.col = mouse.x / BOARD_WIDTH * 8;
+    pos.row = mouse.y / BOARD_WIDTH * 8;
+    return pos;
+}
+
+Soldier *selectSldr(Position SqPos) {
+    return gdata->board->Squares[SqPos.row][SqPos.col].sldr;
 }
 
 Board *createBoard(Set_t *white, Set_t *black) {
@@ -86,9 +139,13 @@ Board *createBoard(Set_t *white, Set_t *black) {
     // initialize the square & set positions
     for (int i = 0; i < 8; i++) {
         for (int j = 0; j < 8; j++) {
+            b->Squares[i][j].rectangle.x = j * SQUARE_WIDTH;
+            b->Squares[i][j].rectangle.y = i * SQUARE_WIDTH;
+            b->Squares[i][j].rectangle.width = SQUARE_WIDTH;
+            b->Squares[i][j].rectangle.height = SQUARE_WIDTH;
             b->Squares[i][j].occupied = false;
             b->Squares[i][j].sldr = NULL;
-            if ((i + j) % 2 == 0) {
+            if (isOdd(i + j)) {
                 b->Squares[i][j].color = gdata->colors[0];
             } else {
                 b->Squares[i][j].color = gdata->colors[1];
@@ -121,15 +178,15 @@ Board *createBoard(Set_t *white, Set_t *black) {
     return b;
 }
 
-Set_t *createSet(COLOR color) {
+Set_t *createSet(TEAM_COLOR color) {
     Set_t *s = malloc(sizeof(Set_t));
     s->count = 16;
     s->color = color;
     s->soldiers = malloc(16 * sizeof(Soldier));
 
-    Soldier_t types[4] = {ROOK, KNIGHT, BISHOP, PAWN};
+    SOLDIER_TYPE types[4] = {ROOK, KNIGHT, BISHOP, PAWN};
     switch (color) {
-    case BLACK:
+    case BLACK_TEAM:
         for (int i = 0; i < 3; i++) {
             s->soldiers[i].type = types[i];
             s->soldiers[7 - i].type = types[i];
@@ -140,7 +197,7 @@ Set_t *createSet(COLOR color) {
             s->soldiers[i].type = PAWN;
         }
         break;
-    case WHITE:
+    case WHITE_TEAM:
         for (int i = 0; i < 3; i++) {
             s->soldiers[8 + i].type = types[i];
             s->soldiers[15 - i].type = types[i];
@@ -195,7 +252,7 @@ Set_t *createSet(COLOR color) {
     return s;
 }
 
-Set_t *onlyType(Soldier_t t, COLOR color) {
+Set_t *onlyType(SOLDIER_TYPE t, TEAM_COLOR color) {
     Set_t *s = createSet(color);
     for (int i = 0; i < 16; i++) {
         if (s->soldiers[i].type != t) {
@@ -206,35 +263,56 @@ Set_t *onlyType(Soldier_t t, COLOR color) {
     return s;
 }
 
-void mirrorBoard(Board *board) {
+void mirrorBoard() {
     Square temp, *sq1, *sq2;
     Position *tpos;
 
     // mirror each soldier position
     for (int j = 0; j < 2; j++) {
         for (int i = 0; i < 16; i++) {
-            tpos = &board->sets[j]->soldiers[i].pos;
+            tpos = &gdata->board->sets[j]->soldiers[i].pos;
             tpos->row = 7 - tpos->row;
             tpos->col = 7 - tpos->col;
         }
     }
 
-    // mirror the rows
+    // mirror rectangles
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 8; j++) {
             sq1 = &gdata->board->Squares[7 - i][j];
-            sq2 = &board->Squares[i][j];
+            sq2 = &gdata->board->Squares[i][j];
+            temp = *sq1;
+            sq1->rectangle = sq2->rectangle;
+            sq2->rectangle = temp.rectangle;
+        }
+    }
+
+    for (int i = 0; i < 8; i++) {
+        for (int j = 0; j < 4; j++) {
+            sq1 = &gdata->board->Squares[i][7 - j];
+            sq2 = &gdata->board->Squares[i][j];
+            temp = *sq1;
+            sq1->rectangle = sq2->rectangle;
+            sq2->rectangle = temp.rectangle;
+        }
+    }
+
+    // mirror rows
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 8; j++) {
+            sq1 = &gdata->board->Squares[7 - i][j];
+            sq2 = &gdata->board->Squares[i][j];
             temp = *sq1;
             *sq1 = *sq2;
             *sq2 = temp;
         }
     }
 
-    // mirror the columns
+    // mirror columns
     for (int i = 0; i < 8; i++) {
         for (int j = 0; j < 4; j++) {
             sq1 = &gdata->board->Squares[i][7 - j];
-            sq2 = &board->Squares[i][j];
+            sq2 = &gdata->board->Squares[i][j];
             temp = *sq1;
             *sq1 = *sq2;
             *sq2 = temp;
@@ -304,7 +382,7 @@ availableSqs *calcNextMovePawn(Square *fsq) {
     // check adjacent enemies
     if (fsq->sldr->pos.row == 3) {
         for (int i = -1; i <= 1; i++) {
-            if (i != 0 && inBound(colmn + i)) {
+            if (i != 0 && inBoundaries(colmn + i)) {
                 enmsq = &(gdata->board->Squares[row][colmn + i]);
                 nsq = &(gdata->board->Squares[row - 1][colmn + i]);
                 if (isEnemy(fsq, enmsq) && enmsq->sldr->otherdt->enpassant) {
@@ -328,7 +406,7 @@ availableSqs *calcNextMoveKnight(Square *fsq) {
     Square *n = NULL;
     for (int col = -2; col <= 2; col++) {
         ncol = colmn + col;
-        if (col == 0 || !inBound(ncol))
+        if (col == 0 || !inBoundaries(ncol))
             continue;
         for (int r = -1; r <= 1; r++) {
             if (r == 0)
@@ -338,7 +416,7 @@ availableSqs *calcNextMoveKnight(Square *fsq) {
             } else {
                 nrow = row + (2 * r);
             }
-            if (!inBound(nrow))
+            if (!inBoundaries(nrow))
                 continue;
             n = &(gdata->board->Squares[nrow][ncol]);
             if (!n->occupied || isEnemy(fsq, n))
@@ -414,7 +492,7 @@ availableSqs *calcNextMoveBishop(Square *fsq) {
 
     Square *n = NULL;
 
-    for (int i = 1; inBound(colmn + i) && inBound(row + i); i++) {
+    for (int i = 1; inBoundaries(colmn + i) && inBoundaries(row + i); i++) {
         n = &(gdata->board->Squares[row + i][colmn + i]);
         if (!n->occupied) {
             push(nextSqs, n);
@@ -425,7 +503,7 @@ availableSqs *calcNextMoveBishop(Square *fsq) {
             break;
     }
 
-    for (int i = 1; inBound(colmn - i) && inBound(row - i); i++) {
+    for (int i = 1; inBoundaries(colmn - i) && inBoundaries(row - i); i++) {
         n = &(gdata->board->Squares[row - i][colmn - i]);
         if (!n->occupied) {
             push(nextSqs, n);
@@ -436,7 +514,7 @@ availableSqs *calcNextMoveBishop(Square *fsq) {
             break;
     }
 
-    for (int i = 1; inBound(colmn + i) && inBound(row - i); i++) {
+    for (int i = 1; inBoundaries(colmn + i) && inBoundaries(row - i); i++) {
         n = &(gdata->board->Squares[row - i][colmn + i]);
         if (!n->occupied) {
             push(nextSqs, n);
@@ -447,7 +525,7 @@ availableSqs *calcNextMoveBishop(Square *fsq) {
             break;
     }
 
-    for (int i = 1; inBound(colmn - i) && inBound(row + i); i++) {
+    for (int i = 1; inBoundaries(colmn - i) && inBoundaries(row + i); i++) {
         n = &(gdata->board->Squares[row + i][colmn - i]);
         if (!n->occupied) {
             push(nextSqs, n);
@@ -477,7 +555,7 @@ availableSqs *calcNextMoveKing(Square *fsq) {
     Square *n = NULL;
     for (int c = -1; c <= 1; c++) {
         for (int r = -1; r <= 1; r++) {
-            if (inBound(row + r) && inBound(colmn + c)) {
+            if (inBoundaries(row + r) && inBoundaries(colmn + c)) {
                 n = &(gdata->board->Squares[row + r][colmn + c]);
                 if (isEnemy(fsq, n) || !n->occupied)
                     push(nextSqs, n);
@@ -496,148 +574,8 @@ bool isEnemy(Square *from, Square *to) {
 Square *chooseSquare(Position pos) {
     if (pos.row != 10) {
         return &(gdata->board->Squares[pos.row][pos.col]);
-    } else {
+    } else
         return 0;
-    }
-}
-
-Position choosePos(CHANGE change) {
-    Position pos = {10, 10};
-    /* on  cancel return  {10,x}
-     * on  errors rerturn {20,x} */
-
-    int valid, raw;
-    char buffer[64], col;
-
-    switch (change) {
-    case FROM:
-        printf("From : ");
-        break;
-    case TO:
-        printf("To : ");
-        break;
-    }
-
-    valid = scanf("%s", buffer);
-    if (!valid || strlen(buffer) > 2) {
-        if (strcmp(buffer, "cancel") == 0) {
-            colorBoardSquares();
-            return pos;
-        }
-        choosePos(change);
-    }
-
-    col = buffer[0];
-    raw = buffer[1] - '0';
-    // if it's from a to h capitalize it
-    if ('a' <= col && col <= 'h') {
-        // to upper case;
-        col = col - 32;
-    }
-
-    if (!(72 >= col && col >= 65 && 1 <= raw && raw <= 8)) {
-        choosePos(change);
-    }
-
-    switch (gdata->ACTIVE) {
-    case WHITE:
-        pos.row = 8 - raw;
-        pos.col = col - 65;
-        return pos;
-        break;
-    case BLACK:
-        pos.row = raw - 1;
-        pos.col = 'H' - col;
-        return pos;
-        break;
-    }
-    return pos;
-}
-
-int moveSldr() {
-    Position pos = {0};
-    pos = choosePos(FROM);
-
-    Square *from = chooseSquare(pos);
-    if (from == 0)
-        // if it canceled return 2
-        return 2;
-
-    if (!from->occupied)
-        return moveSldr();
-
-    if (from->sldr->TEAM->color != gdata->ACTIVE) {
-        switch (gdata->ACTIVE) {
-        case WHITE:
-            printf("White change\n");
-            break;
-        case BLACK:
-            printf("Black change\n");
-            break;
-        }
-        return moveSldr();
-    }
-
-    gdata->available = calcNextMove(from);
-
-    if (gdata->available == NULL || gdata->available->top <= 0) {
-        // if it can't move try again
-        printf("Can't move\n");
-        return moveSldr();
-    }
-
-    drawBoard();
-
-    pos = choosePos(TO);
-    Square *next = chooseSquare(pos);
-    if (next == 0)
-        return 2;
-
-    if (isAvailable(next)) {
-        from->occupied = false;
-        // if he going to kill enemy
-        if (next->occupied) {
-            next->sldr->State = DEAD;
-            next->sldr->TEAM->count--;
-        }
-
-        if (from->sldr->type == PAWN) {
-            if (from->sldr->otherdt->NMOVES < MORE_THAN_ONE)
-                (from->sldr->otherdt->NMOVES)++;
-
-            for (int i = 0; i < 8; i++) {
-                if (gdata->board->sets[1]->soldiers[i].otherdt->enpassant)
-                    gdata->board->sets[1]->soldiers[i].otherdt->enpassant = false;
-                if (gdata->board->sets[0]->soldiers[i + 8].otherdt->enpassant)
-                    gdata->board->sets[0]->soldiers[i + 8].otherdt->enpassant =
-                        false;
-            }
-
-            if (pos.row == 3) {
-                if (from->sldr->otherdt->NMOVES == ZERO) {
-                    from->sldr->otherdt->enpassant = true;
-                } /* else
-                     from->sldr->otherdt->enpassant = COULD_BE;
-                 */
-            }
-
-            if (pos.row == 2 && pos.col != from->sldr->pos.col) {
-                gdata->board->Squares[from->sldr->pos.row][pos.col].sldr->State =
-                    DEAD;
-                gdata->board->Squares[from->sldr->pos.row][pos.col]
-                    .sldr->TEAM->count--;
-                gdata->board->Squares[from->sldr->pos.row][pos.col].occupied = false;
-            }
-        }
-        next->sldr = from->sldr;
-        next->occupied = true;
-        from->sldr = NULL;
-        next->sldr->pos = pos;
-        colorBoardSquares();
-        changeActive();
-        return 1;
-    }
-    return 2;
 }
 
 bool isAvailable(Square *sq) {
@@ -656,77 +594,58 @@ void changeActive() { gdata->ACTIVE = !gdata->ACTIVE; }
 
 void drawBoard() {
     // draw gdata->board squares and soldiers
-    //
-    CLEAR;
     switch (gdata->ACTIVE) {
-    case BLACK:
+    case BLACK_TEAM:
         drawWhileBlack();
         break;
-    case WHITE:
+    case WHITE_TEAM:
         drawWhileWhite();
         break;
     }
 }
 
 void drawWhileWhite() {
-    printf("    \033[;31mBLACK  soldiers count : %d\033[;0m\n",
-           gdata->board->sets[0]->count);
     for (int i = 0; i < 8; i++) {
-        printf("%d  ", 8 - i);
         for (int j = 0; j < 8; j++) {
-            displaySq(&gdata->board->Squares[i][j]);
-            // displaySqPosition(&gdata->board->Squares[i][j]);
+            drawSq(&gdata->board->Squares[i][j]);
         }
-        printf("\n");
     }
-    printf("  ");
-    for (int i = 0; i < 8; i++) {
-        printf(" %2c ", 'A' + i);
-        // printf(" %2c ", 'A' + i);
-    }
-    printf("\n");
-    printf("    WHITE  soldiers count : %d\n", gdata->board->sets[1]->count);
 }
 
 void drawWhileBlack() {
-    printf("    WHITE  soldiers count : %d\n", gdata->board->sets[1]->count);
     for (int i = 0; i < 8; i++) {
-        printf("%d  ", i + 1);
         for (int j = 0; j < 8; j++) {
-            displaySq(&gdata->board->Squares[i][j]);
-            // displaySqPosition(&gdata->board->Squares[i][j]);
+            drawSq(&gdata->board->Squares[i][j]);
         }
-        printf("\n");
     }
-    printf("  ");
-    for (int i = 0; i < 8; i++) {
-        printf(" %2c ", 'H' - i);
-        // printf(" %2c ", 'A' + i);
-    }
-    printf("\n");
-    printf("    \033[;31m%s  soldiers count : %d\033[;0m\n", "BLACK",
-           gdata->board->sets[0]->count);
 }
 
-void displaySq(Square *sq) {
+void drawSq(Square *sq) {
+    DrawRectangleRec(sq->rectangle, sq->color);
     if (sq->occupied) {
-        if (sq->sldr->TEAM->color == BLACK) {
-            printf(" \033[;31m%s\033[;0m ", sq->sldr->shap);
-        } else {
-            printf(" %s ", sq->sldr->shap);
+        float fontsize = SQUARE_WIDTH / 1.75;
+        Vector2 fontv = MeasureTextEx(GetFontDefault(), sq->sldr->shap, fontsize, 0);
+        float x = SQUARE_WIDTH * sq->sldr->pos.col + (SQUARE_WIDTH - fontv.x) * 0.5;
+        float y = SQUARE_WIDTH * sq->sldr->pos.row + (SQUARE_WIDTH - fontv.y) * 0.5;
+        switch (sq->sldr->TEAM->color) {
+        case WHITE_TEAM:
+            DrawText(sq->sldr->shap, x, y, fontsize, WHITE);
+            break;
+        case BLACK_TEAM:
+            DrawText(sq->sldr->shap, x, y, fontsize, BLACK);
+            break;
         }
-    } else {
-        printf("%s%s", sq->color, sq->color);
-        printf("%s%s", sq->color, sq->color);
     }
 }
 
 void displayNextSqsList() {
+    /*
     for (int i = 1; i <= gdata->available->top; i++) {
         if (i % 7 == 0)
-            printf("\n");
+        // printf("\n");
     }
-    printf("\n");
+    // printf("\n");
+    */
 }
 
 void colorBoardSquares() {
@@ -741,7 +660,7 @@ void colorBoardSquares() {
     }
 }
 
-bool inBound(int pos) {
+bool inBoundaries(int pos) {
     if (0 <= pos && pos <= 7)
         return true;
     return false;
@@ -774,6 +693,7 @@ void stackResize(availableSqs *st, int size) {
 }
 
 void destroydata() {
+    CloseWindow();
     for (int i = 0; i < 16; i++) {
         free(gdata->board->sets[0]->soldiers[i].shap);
         free(gdata->board->sets[1]->soldiers[i].shap);
@@ -821,21 +741,31 @@ availableSqs *mergeList(availableSqs *first, availableSqs *second) {
     return nextSqs;
 }
 
-char **initColor() {
-    char **colors = malloc(3 * sizeof(char *));
-    colors[0] = "█";                  // white
-    colors[1] = "\033[;31m█\033[;0m"; // red
-    colors[2] = "\033[;32m█\033[;0m"; // green
+Color *initColor() {
+    Color *colors = malloc(3 * sizeof(char *));
+    colors[0] = DARKBROWN;
+    colors[1] = BEIGE;
+    colors[2] = GREEN;
     return colors;
 }
 
 void initgdata() {
-    gdata = malloc(sizeof(Data));
-    Set_t *white = createSet(WHITE);
-    Set_t *black = createSet(BLACK);
+    SetTraceLogLevel(LOG_NONE);
+    InitWindow(WIN_WIDTH, WIN_HEIGHT, "Chess");
+    SetTargetFPS(60);
+    gdata = malloc(sizeof(globalData));
+    Set_t *white = createSet(WHITE_TEAM);
+    Set_t *black = createSet(BLACK_TEAM);
     gdata->colors = initColor();
     gdata->board = createBoard(white, black);
-    gdata->ACTIVE = WHITE;
+    gdata->ACTIVE = WHITE_TEAM;
     gdata->available = NULL;
+    gdata->movementChange = FROM;
+    gdata->fromSquare = NULL;
     colorBoardSquares();
+}
+
+void debug() {
+    printf("%ld\n", sizeof(globalData));
+    ;
 }

@@ -3,18 +3,18 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-void load(Data *gData) {
+void load(globalData *gData) {
     char *file = "./.data";
     FILE *fd = NULL;
     fd = fopen(file, "rb");
-    COLOR *act = malloc(sizeof(COLOR));
+    TEAM_COLOR *act = malloc(sizeof(TEAM_COLOR));
     if (fd) {
         Set_t *black = gData->board->sets[0];
         Set_t *white = gData->board->sets[1];
 
-        fread(act, sizeof(COLOR), 1, fd);
+        fread(act, sizeof(TEAM_COLOR), 1, fd);
         if (*act != gData->ACTIVE) {
-            mirrorBoard(gData->board);
+            mirrorBoard();
         }
         gData->ACTIVE = *act;
 
@@ -38,7 +38,7 @@ void load(Data *gData) {
 // sldr pos , sq occupation  , set count,
 //
 
-void readSet(FILE *file, Set_t *s, Data *gData) {
+void readSet(FILE *file, Set_t *s, globalData *gData) {
     fread(&s->count, sizeof(int), 1, file);
     int col = 0, row = 0;
     for (int i = 0; i < 16; i++) {
@@ -73,7 +73,7 @@ void readSq(FILE *file, Square *sq) {
     */
 }
 
-void save(Data *gData) {
+void save(globalData *gData) {
     char *file = "./.data";
     FILE *fd = NULL;
     fd = fopen(file, "wb");
@@ -82,7 +82,7 @@ void save(Data *gData) {
         Set_t *black = gData->board->sets[0];
 
         fflush(fd);
-        fwrite(&gData->ACTIVE, sizeof(COLOR), 1, fd);
+        fwrite(&gData->ACTIVE, sizeof(TEAM_COLOR), 1, fd);
         for (int i = 0; i < 8; i++) {
             for (int j = 0; j < 8; j++) {
                 writeSq(fd, &gData->board->Squares[i][j]);

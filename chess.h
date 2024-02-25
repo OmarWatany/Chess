@@ -1,3 +1,7 @@
+#ifndef _CHESS_HEِِِADER
+#define _CHESS_HEِِِADER
+
+#include "raylib.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,72 +15,89 @@
 #define CLEAR system("cls")
 #endif
 
+#define WIN_WIDTH 800.0f
+#define WIN_HEIGHT 800.0f
+#define BOARD_WIDTH 800.0f
+#define BOARD_HEIGHT 800.0f
+#define BOARD_START 0.0f
+#define SQUARE_WIDTH (WIN_WIDTH / 8.0f)
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
+#define isOdd(x) ((x) % 2)
 
 typedef enum { DEAD, LIVE, CANT_MOVE } SOLDIER_STATE;
-typedef enum { WHITE, BLACK } COLOR;
-typedef enum { PAWN = 1, KNIGHT, BISHOP, ROOK, QUEEN, KING } Soldier_t;
+typedef enum { WHITE_TEAM, BLACK_TEAM } TEAM_COLOR;
+typedef enum { PAWN = 1, KNIGHT, BISHOP, ROOK, QUEEN, KING } SOLDIER_TYPE;
 typedef enum { FROM, TO } CHANGE;
 typedef enum { ZERO, ONE, MORE_THAN_ONE } NM_OF_MOVES;
-typedef struct Set_t Set_t;
 
-typedef struct {
+typedef struct Set_t Set_t;
+typedef struct Position Position;
+typedef struct OtherData OtherData;
+typedef struct Soldier Soldier;
+typedef struct Square Square;
+typedef struct Board Board;
+typedef struct availableSqs availableSqs;
+typedef struct globalData globalData;
+
+struct Position {
     int row;
     int col;
-} Position;
+};
 
-typedef struct {
+struct OtherData {
     NM_OF_MOVES NMOVES;
     union {
         bool enpassant;
         bool check;
     };
-} OtherData;
+};
 
-typedef struct {
+struct Soldier {
     Set_t *TEAM;
     OtherData *otherdt;
     char *shap;
     Position pos;
-    Soldier_t type;
+    SOLDIER_TYPE type;
     SOLDIER_STATE State;
-} Soldier;
+};
 
 struct Set_t {
     Soldier *soldiers;
     unsigned int count;
-    COLOR color;
+    TEAM_COLOR color;
 };
-// set struct
 
-typedef struct {
+struct Square {
     Soldier *sldr;
-    char *color;
+    Color color;
+    Rectangle rectangle;
     bool occupied;
-} Square;
+};
 
-typedef struct {
+struct Board {
     Set_t *sets[2];
     Square Squares[8][8];
-    COLOR ACTIVE;
-} Board;
+};
 
-typedef struct {
+struct availableSqs {
     Square **stack;
     int top;
     int count;
-} availableSqs;
+};
 
-typedef struct {
+struct globalData {
     Board *board;
     availableSqs *available;
-    char **colors;
-    COLOR ACTIVE;
-} Data;
+    Color *colors;
+    TEAM_COLOR ACTIVE;
+    CHANGE movementChange;
+    Square *fromSquare;
+};
 
 void game();
-Set_t *createSet(COLOR color);
+void killEnemey(Soldier *sldr);
+Set_t *createSet(TEAM_COLOR color);
 Board *createBoard(Set_t *white, Set_t *black);
 // next position functions
 availableSqs *calcNextMove(Square *sq);
@@ -90,12 +111,14 @@ bool isEnemy(Square *from, Square *to);
 // move functions
 Square *chooseSquare(Position pos);
 Position choosePos(CHANGE change);
-int moveSldr();
+Position getPos();
+Soldier *selectSldr(Position SqPos);
+int moveSldr(Position pos);
 bool isAvailable(Square *sq);
 void changeActive();
 // displaying functions
 void drawBoard();
-void displaySq(Square *sq);
+void drawSq(Square *sq);
 void displayNextSqsList();
 // av list functions
 availableSqs *dlist(unsigned int);
@@ -106,14 +129,16 @@ void stackResize(availableSqs *, int);
 void destroydata();
 void erroredEnd();
 void destroyAvList(availableSqs *);
-
-// for testing
-//
-Set_t *onlyType(Soldier_t t, COLOR color);
-void mirrorBoard(Board *);
+void mirrorBoard();
 void colorBoardSquares();
-bool inBound(int);
-char **initColor();
+bool inBoundaries(int);
+Color *initColor();
 void drawWhileWhite();
 void drawWhileBlack();
 void initgdata();
+
+// for testing
+//
+Set_t *onlyType(SOLDIER_TYPE t, TEAM_COLOR color);
+
+#endif // !_CHESS_HEِِِADER
