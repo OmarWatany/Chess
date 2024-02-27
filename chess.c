@@ -15,6 +15,10 @@ int main() {
     destroydata();
     return 0;
 }
+void cancelMovment() {
+    gdata->movementChange = FROM;
+    colorBoardSquares();
+}
 
 void game() {
     int valid = 0;
@@ -28,6 +32,9 @@ void game() {
             break;
         } else if (IsKeyReleased(KEY_F)) {
             ToggleFullscreen();
+        } else if (IsKeyReleased(KEY_C)) {
+            // cancel movment
+            cancelMovment();
         }
         if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
             Position pos = getPos();
@@ -35,39 +42,33 @@ void game() {
             if (valid == 1)
                 mirrorBoard();
         }
-
         EndDrawing();
     }
 }
 
 int moveSldr(Position pos) {
-    // printf("row %d\n", pos.row);
-
     Square **from = &gdata->fromSquare, *next;
     switch (gdata->movementChange) {
     case FROM:
         (*from) = chooseSquare(pos);
-        if (!(*from)->occupied) {
-            return 0;
-        }
-        // if choosed non active team's soldier
-        if ((*from)->sldr->TEAM->color != gdata->ACTIVE) {
+        // if choosed empty square or non active team's soldier
+        if (!(*from)->occupied || (*from)->sldr->TEAM->color != gdata->ACTIVE) {
             colorBoardSquares();
             return 0;
         }
         gdata->available = calcNextMove(*from);
         if (gdata->available == NULL || gdata->available->top <= 0) {
             colorBoardSquares();
-            return moveSldr(pos);
+            return 0;
         }
         gdata->movementChange = TO;
         return 2;
     case TO:
         next = chooseSquare(pos);
         if (next->occupied && next->sldr->TEAM->color == gdata->ACTIVE) {
-            gdata->movementChange = FROM;
-            colorBoardSquares();
-            return moveSldr(pos);
+            cancelMovment();
+            moveSldr(pos);
+            return 2;
         }
         if (isAvailable(next)) {
             // if he is going to kill an enemy
@@ -433,9 +434,8 @@ availableSqs *calcNextMoveRook(Square *fsq) {
     // available squares before and after.
     //
 
-    availableSqs *nextSqs;
+    availableSqs *nextSqs = NULL;
     nextSqs = dlist(15);
-
     Square *n = NULL;
     for (int c = colmn + 1; c <= 7; c++) {
         n = &(gdata->board->Squares[row][c]);
@@ -490,47 +490,47 @@ availableSqs *calcNextMoveBishop(Square *fsq) {
     availableSqs *nextSqs;
     nextSqs = dlist(15);
 
-    Square *n = NULL;
+    Square *next = NULL;
 
     for (int i = 1; inBoundaries(colmn + i) && inBoundaries(row + i); i++) {
-        n = &(gdata->board->Squares[row + i][colmn + i]);
-        if (!n->occupied) {
-            push(nextSqs, n);
-        } else if (isEnemy(fsq, n)) {
-            push(nextSqs, n);
+        next = &(gdata->board->Squares[row + i][colmn + i]);
+        if (!next->occupied) {
+            push(nextSqs, next);
+        } else if (isEnemy(fsq, next)) {
+            push(nextSqs, next);
             break;
         } else
             break;
     }
 
     for (int i = 1; inBoundaries(colmn - i) && inBoundaries(row - i); i++) {
-        n = &(gdata->board->Squares[row - i][colmn - i]);
-        if (!n->occupied) {
-            push(nextSqs, n);
-        } else if (isEnemy(fsq, n)) {
-            push(nextSqs, n);
+        next = &(gdata->board->Squares[row - i][colmn - i]);
+        if (!next->occupied) {
+            push(nextSqs, next);
+        } else if (isEnemy(fsq, next)) {
+            push(nextSqs, next);
             break;
         } else
             break;
     }
 
     for (int i = 1; inBoundaries(colmn + i) && inBoundaries(row - i); i++) {
-        n = &(gdata->board->Squares[row - i][colmn + i]);
-        if (!n->occupied) {
-            push(nextSqs, n);
-        } else if (isEnemy(fsq, n)) {
-            push(nextSqs, n);
+        next = &(gdata->board->Squares[row - i][colmn + i]);
+        if (!next->occupied) {
+            push(nextSqs, next);
+        } else if (isEnemy(fsq, next)) {
+            push(nextSqs, next);
             break;
         } else
             break;
     }
 
     for (int i = 1; inBoundaries(colmn - i) && inBoundaries(row + i); i++) {
-        n = &(gdata->board->Squares[row + i][colmn - i]);
-        if (!n->occupied) {
-            push(nextSqs, n);
-        } else if (isEnemy(fsq, n)) {
-            push(nextSqs, n);
+        next = &(gdata->board->Squares[row + i][colmn - i]);
+        if (!next->occupied) {
+            push(nextSqs, next);
+        } else if (isEnemy(fsq, next)) {
+            push(nextSqs, next);
             break;
         } else
             break;
@@ -721,7 +721,6 @@ void destroyAvList(availableSqs *st) {
     if (st != NULL) {
         free(st->stack);
         free(st);
-        // st = NULL;
     }
 }
 
