@@ -1,32 +1,33 @@
 #include "data.h"
+#include "chess.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
-void load(globalData *gData) {
+void load(Context *context) {
     char *file = "./.data";
     FILE *fd = NULL;
     fd = fopen(file, "rb");
     TEAM_COLOR *act = malloc(sizeof(TEAM_COLOR));
     if (fd) {
-        Set_t *black = gData->board->sets[0];
-        Set_t *white = gData->board->sets[1];
+        Set_t *black = context->board->sets[0];
+        Set_t *white = context->board->sets[1];
 
         fread(act, sizeof(TEAM_COLOR), 1, fd);
-        if (*act != gData->ACTIVE) {
+        if (*act != context->ACTIVE) {
             mirrorBoard();
         }
-        gData->ACTIVE = *act;
+        context->ACTIVE = *act;
 
         for (int i = 0; i < 8; i++) {
             for (int j = 0; j < 8; j++) {
                 // printf("%d %d ", i, j);
-                readSq(fd, &gData->board->Squares[i][j]);
+                readSq(fd, &context->board->Squares[i][j]);
             }
         }
         // sleep(240);
-        readSet(fd, white, gData);
-        readSet(fd, black, gData);
+        readSet(fd, white, context);
+        readSet(fd, black, context);
 
     } else {
         perror("coudn't open file or not found");
@@ -38,14 +39,14 @@ void load(globalData *gData) {
 // sldr pos , sq occupation  , set count,
 //
 
-void readSet(FILE *file, Set_t *s, globalData *gData) {
+void readSet(FILE *file, Set_t *s, Context *context) {
     fread(&s->count, sizeof(int), 1, file);
     int col = 0, row = 0;
     for (int i = 0; i < 16; i++) {
         readSldr(file, &s->soldiers[i]);
         col = s->soldiers[i].pos.col;
         row = s->soldiers[i].pos.row;
-        gData->board->Squares[row][col].sldr = &s->soldiers[i];
+        context->board->Squares[row][col].sldr = &s->soldiers[i];
     }
 }
 
@@ -73,19 +74,19 @@ void readSq(FILE *file, Square *sq) {
     */
 }
 
-void save(globalData *gData) {
+void save(Context *context) {
     char *file = "./.data";
     FILE *fd = NULL;
     fd = fopen(file, "wb");
     if (fd) {
-        Set_t *white = gData->board->sets[1];
-        Set_t *black = gData->board->sets[0];
+        Set_t *white = context->board->sets[1];
+        Set_t *black = context->board->sets[0];
 
         fflush(fd);
-        fwrite(&gData->ACTIVE, sizeof(TEAM_COLOR), 1, fd);
+        fwrite(&context->ACTIVE, sizeof(TEAM_COLOR), 1, fd);
         for (int i = 0; i < 8; i++) {
             for (int j = 0; j < 8; j++) {
-                writeSq(fd, &gData->board->Squares[i][j]);
+                writeSq(fd, &context->board->Squares[i][j]);
             }
         }
         writeSet(fd, white);

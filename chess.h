@@ -1,7 +1,7 @@
 #ifndef _CHESS_HEِِِADER
 #define _CHESS_HEِِِADER
 
-#include "raylib.h"
+#include "raylib/include/raylib.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,6 +24,7 @@
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 #define isOdd(x) ((x) % 2)
+#define isEven(x) (!isOdd(x))
 
 typedef enum { DEAD, LIVE, CANT_MOVE } SOLDIER_STATE;
 typedef enum { WHITE_TEAM, BLACK_TEAM } TEAM_COLOR;
@@ -38,7 +39,7 @@ typedef struct Soldier Soldier;
 typedef struct Square Square;
 typedef struct Board Board;
 typedef struct availableSqs availableSqs;
-typedef struct globalData globalData;
+typedef struct Context Context;
 
 struct Position {
     int row;
@@ -56,7 +57,7 @@ struct OtherData {
 struct Soldier {
     Set_t *TEAM;
     OtherData *otherdt;
-    char *shap;
+    Texture2D shapText;
     Position pos;
     SOLDIER_TYPE type;
     SOLDIER_STATE State;
@@ -86,7 +87,7 @@ struct availableSqs {
     int count;
 };
 
-struct globalData {
+struct Context {
     Board *board;
     availableSqs *available;
     Color *colors;
@@ -107,6 +108,7 @@ availableSqs *calcNextMoveRook(Square *fsq);
 availableSqs *calcNextMoveBishop(Square *fsq);
 availableSqs *calcNextMoveQueen(Square *fsq);
 availableSqs *calcNextMoveKing(Square *fsq);
+// astack_t *calcNextMoveKing(Square *fsq);
 bool isEnemy(Square *from, Square *to);
 // move functions
 Square *chooseSquare(Position pos);
