@@ -7,15 +7,8 @@
 #include <string.h>
 
 Context *context;
-void colorList(alist_t *list);
-
-int16_t alist_push_sizet(alist_t *list, size_t value) {
-    return alist_push(list, &value);
-}
-
-Square *alist_at_sq(alist_t *list, size_t at) {
-    return (Square *)(*(size_t *)alist_at(list, at));
-}
+int16_t alist_push_sq(alist_t *list, Square *sq);
+Square *alist_sq_at(alist_t *list, size_t at);
 
 int main() {
     initgdata();
@@ -68,7 +61,7 @@ int moveSldr(Position pos) {
             return 0;
         }
         context->availableSqs = calcNextMove(*from);
-        colorList(context->availableSqs);
+        // colorList(context->availableSqs);
         if (context->availableSqs == NULL || alist_is_empty(context->availableSqs)) {
             colorBoardSquares();
             return 0;
@@ -359,13 +352,13 @@ alist_t *calcNextMovePawn(Square *fsq) {
     // check the next rows
     for (int i = 1; i <= praws && !squares[row - 1][colmn]->occupied; i++) {
         nsq = squares[row - i][colmn];
-        if (!nsq->occupied) alist_push_sizet(nextSqs, (size_t)nsq);
+        if (!nsq->occupied) alist_push_sq(nextSqs, nsq);
     }
     // check the next colmns
     for (int i = -1; i <= 1; i++) {
         if (i != 0) {
             nsq = squares[row - 1][colmn + i];
-            if (isEnemy(fsq, nsq)) alist_push_sizet(nextSqs, (size_t)nsq);
+            if (isEnemy(fsq, nsq)) alist_push_sq(nextSqs, nsq);
         }
     }
     // to calc en passant
@@ -380,7 +373,7 @@ alist_t *calcNextMovePawn(Square *fsq) {
                 enmsq = squares[row][colmn + i];
                 nsq = squares[row - 1][colmn + i];
                 if (isEnemy(fsq, enmsq) && enmsq->sldr->otherdt->enpassant) {
-                    alist_push_sizet(nextSqs, (size_t)nsq);
+                    alist_push_sq(nextSqs, nsq);
                 }
             }
         }
@@ -411,7 +404,7 @@ alist_t *calcNextMoveKnight(Square *fsq) {
             }
             if (!inBoundaries(nrow)) continue;
             n = &(context->board->Squares[nrow][ncol]);
-            if (!n->occupied || isEnemy(fsq, n)) alist_push_sizet(nextSqs, (size_t)n);
+            if (!n->occupied || isEnemy(fsq, n)) alist_push_sq(nextSqs, n);
         }
     }
 
@@ -430,9 +423,9 @@ alist_t *calcNextMoveRook(Square *fsq) {
     for (int c = colmn + 1; c <= 7; c++) {
         n = &(context->board->Squares[row][c]);
         if (!n->occupied) {
-            alist_push_sizet(nextSqs, (size_t)n);
+            alist_push_sq(nextSqs, n);
         } else if (isEnemy(fsq, n)) {
-            alist_push_sizet(nextSqs, (size_t)n);
+            alist_push_sq(nextSqs, n);
             break;
         } else
             break;
@@ -441,9 +434,9 @@ alist_t *calcNextMoveRook(Square *fsq) {
     for (int c = colmn - 1; c >= 0; c--) {
         n = &(context->board->Squares[row][c]);
         if (!n->occupied) {
-            alist_push_sizet(nextSqs, (size_t)n);
+            alist_push_sq(nextSqs, n);
         } else if (isEnemy(fsq, n)) {
-            alist_push_sizet(nextSqs, (size_t)n);
+            alist_push_sq(nextSqs, n);
             break;
         } else
             break;
@@ -452,9 +445,9 @@ alist_t *calcNextMoveRook(Square *fsq) {
     for (int r = row + 1; r <= 7; r++) {
         n = &(context->board->Squares[r][colmn]);
         if (!n->occupied) {
-            alist_push_sizet(nextSqs, (size_t)n);
+            alist_push_sq(nextSqs, n);
         } else if (isEnemy(fsq, n)) {
-            alist_push_sizet(nextSqs, (size_t)n);
+            alist_push_sq(nextSqs, n);
             break;
         } else
             break;
@@ -463,9 +456,9 @@ alist_t *calcNextMoveRook(Square *fsq) {
     for (int r = row - 1; r >= 0; r--) {
         n = &(context->board->Squares[r][colmn]);
         if (!n->occupied) {
-            alist_push_sizet(nextSqs, (size_t)n);
+            alist_push_sq(nextSqs, n);
         } else if (isEnemy(fsq, n)) {
-            alist_push_sizet(nextSqs, (size_t)n);
+            alist_push_sq(nextSqs, n);
             break;
         } else
             break;
@@ -486,9 +479,9 @@ alist_t *calcNextMoveBishop(Square *fsq) {
     for (int i = 1; inBoundaries(colmn + i) && inBoundaries(row + i); i++) {
         next = &(context->board->Squares[row + i][colmn + i]);
         if (!next->occupied) {
-            alist_push_sizet(nextSqs, (size_t)next);
+            alist_push_sq(nextSqs, next);
         } else if (isEnemy(fsq, next)) {
-            alist_push_sizet(nextSqs, (size_t)next);
+            alist_push_sq(nextSqs, next);
             break;
         } else
             break;
@@ -497,9 +490,9 @@ alist_t *calcNextMoveBishop(Square *fsq) {
     for (int i = 1; inBoundaries(colmn - i) && inBoundaries(row - i); i++) {
         next = &(context->board->Squares[row - i][colmn - i]);
         if (!next->occupied) {
-            alist_push_sizet(nextSqs, (size_t)next);
+            alist_push_sq(nextSqs, next);
         } else if (isEnemy(fsq, next)) {
-            alist_push_sizet(nextSqs, (size_t)next);
+            alist_push_sq(nextSqs, next);
             break;
         } else
             break;
@@ -508,9 +501,9 @@ alist_t *calcNextMoveBishop(Square *fsq) {
     for (int i = 1; inBoundaries(colmn + i) && inBoundaries(row - i); i++) {
         next = &(context->board->Squares[row - i][colmn + i]);
         if (!next->occupied) {
-            alist_push_sizet(nextSqs, (size_t)next);
+            alist_push_sq(nextSqs, next);
         } else if (isEnemy(fsq, next)) {
-            alist_push_sizet(nextSqs, (size_t)next);
+            alist_push_sq(nextSqs, next);
             break;
         } else
             break;
@@ -519,9 +512,9 @@ alist_t *calcNextMoveBishop(Square *fsq) {
     for (int i = 1; inBoundaries(colmn - i) && inBoundaries(row + i); i++) {
         next = &(context->board->Squares[row + i][colmn - i]);
         if (!next->occupied) {
-            alist_push_sizet(nextSqs, (size_t)next);
+            alist_push_sq(nextSqs, next);
         } else if (isEnemy(fsq, next)) {
-            alist_push_sizet(nextSqs, (size_t)next);
+            alist_push_sq(nextSqs, next);
             break;
         } else
             break;
@@ -549,7 +542,7 @@ alist_t *calcNextMoveKing(Square *fsq) {
         for (int r = -1; r <= 1; r++) {
             if (inBoundaries(row + r) && inBoundaries(colmn + c)) {
                 n = &(context->board->Squares[row + r][colmn + c]);
-                if (isEnemy(fsq, n) || !n->occupied) alist_push_sizet(nextSqs, (size_t)n);
+                if (isEnemy(fsq, n) || !n->occupied) alist_push_sq(nextSqs, n);
             }
         }
     }
@@ -571,7 +564,7 @@ Square *chooseSquare(Position pos) {
 bool isAvailable(Square *sq) {
     if (context->availableSqs != NULL) {
         for (size_t i = 0; i < alist_size(context->availableSqs); i++) {
-            if (sq == alist_at_sq(context->availableSqs, i)) {
+            if (sq == alist_sq_at(context->availableSqs, i)) {
                 return true;
             }
         }
@@ -623,7 +616,7 @@ alist_t *mergeList(alist_t *first, alist_t *second) {
     alist_t *nextSqs;
     nextSqs = first;
     for (size_t i = 0; i < alist_size(second); i++) {
-        alist_push_sizet(first, (size_t)alist_at_sq(second, i));
+        alist_push(first, alist_at(second, i));
     }
     destroy_alist(&second);
     return nextSqs;
@@ -678,11 +671,15 @@ void destroydata() {
     free(context);
 }
 
-void colorList(alist_t *list) {
-    if (!list || alist_is_empty(list)) return;
-    for (size_t i = 0; i < alist_size(list); i++) {
-        alist_at_sq(list, i)->color = GREEN;
-    }
+int16_t alist_push_sq(alist_t *list, Square *sq) {
+    if (!list || !sq) return EXIT_FAILURE;
+    size_t square_address = (size_t)sq;
+    sq->color = GREEN;
+    return alist_push(list, &square_address);
+}
+
+Square *alist_sq_at(alist_t *list, size_t at) {
+    return (Square *)(*(size_t *)alist_at(list, at));
 }
 
 void debug() {
