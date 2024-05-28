@@ -1,6 +1,7 @@
 #ifndef _CHESS_HEِِِADER
 #define _CHESS_HEِِِADER
 
+#include "gdslib/include/garraylist.h"
 #include "raylib/include/raylib.h"
 #include <stdbool.h>
 #include <stdio.h>
@@ -38,7 +39,7 @@ typedef struct OtherData OtherData;
 typedef struct Soldier Soldier;
 typedef struct Square Square;
 typedef struct Board Board;
-typedef struct availableSqs availableSqs;
+// typedef struct alist_t alist_t;
 typedef struct Context Context;
 
 struct Position {
@@ -81,15 +82,9 @@ struct Board {
     Square Squares[8][8];
 };
 
-struct availableSqs {
-    Square **stack;
-    int top;
-    int count;
-};
-
 struct Context {
     Board *board;
-    availableSqs *available;
+    alist_t *availableSqs;
     Color *colors;
     TEAM_COLOR ACTIVE;
     CHANGE movementChange;
@@ -101,14 +96,13 @@ void killEnemey(Soldier *sldr);
 Set_t *createSet(TEAM_COLOR color);
 Board *createBoard(Set_t *white, Set_t *black);
 // next position functions
-availableSqs *calcNextMove(Square *sq);
-availableSqs *calcNextMovePawn(Square *fsq);
-availableSqs *calcNextMoveKnight(Square *fsq);
-availableSqs *calcNextMoveRook(Square *fsq);
-availableSqs *calcNextMoveBishop(Square *fsq);
-availableSqs *calcNextMoveQueen(Square *fsq);
-availableSqs *calcNextMoveKing(Square *fsq);
-// astack_t *calcNextMoveKing(Square *fsq);
+alist_t *calcNextMove(Square *sq);
+alist_t *calcNextMovePawn(Square *fsq);
+alist_t *calcNextMoveKnight(Square *fsq);
+alist_t *calcNextMoveRook(Square *fsq);
+alist_t *calcNextMoveBishop(Square *fsq);
+alist_t *calcNextMoveQueen(Square *fsq);
+alist_t *calcNextMoveKing(Square *fsq);
 bool isEnemy(Square *from, Square *to);
 // move functions
 Square *chooseSquare(Position pos);
@@ -123,14 +117,11 @@ void drawBoard();
 void drawSq(Square *sq);
 void displayNextSqsList();
 // av list functions
-availableSqs *dlist(unsigned int);
-availableSqs *mergeList(availableSqs *, availableSqs *);
-void push(availableSqs *, Square *);
-void stackResize(availableSqs *, int);
+alist_t *mergeList(alist_t *, alist_t *);
 // closing functions
 void destroydata();
 void erroredEnd();
-void destroyAvList(availableSqs *);
+void destroyAvList(alist_t *);
 void mirrorBoard();
 void colorBoardSquares();
 bool inBoundaries(int);

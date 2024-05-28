@@ -1,6 +1,7 @@
-CFLAGS = -Wall -Wextra -Werror 
+CFLAGS = -Wall -Wextra -g
 RAYLIB = -I./raylib/include/ -L./raylib/lib/ -lraylib -lGL -lm 
-LIBS = $(RAYLIB)
+GDSLIB = -I./gdslib/include/ -L./gdslib/lib/ -lgdslib 
+LIBS = $(RAYLIB) $(GDSLIB)
 
 
 install: chess.c data.c
