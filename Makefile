@@ -5,7 +5,7 @@ LIBS = $(RAYLIB) $(GDSLIB)
 
 
 install: chess.c data.c
-	gcc $(CFLAGS)  chess.c data.c -o chess $(LIBS)
+	gcc $(CFLAGS) chess.c data.c -o chess $(LIBS)
 
 win: chess.c data.c
 	x86_64-w64-mingw32-gcc chess.c data.c -o wnchess

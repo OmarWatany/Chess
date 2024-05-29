@@ -310,27 +310,11 @@ void mirrorBoard() {
 alist_t *calcNextMove(Square *sq) {
     Soldier *sldr = sq->sldr;
     destroy_alist(&context->availableSqs);
-    switch (sldr->type) {
-    case PAWN:
-        return calcNextMovePawn(sq);
-        break;
-    case KNIGHT:
-        return calcNextMoveKnight(sq);
-        break;
-    case BISHOP:
-        return calcNextMoveBishop(sq);
-        break;
-    case ROOK:
-        return calcNextMoveRook(sq);
-        break;
-    case QUEEN:
-        return calcNextMoveQueen(sq);
-        break;
-    case KING:
-        return calcNextMoveKing(sq);
-        break;
-    }
-    return 0;
+    if (!sldr) return NULL;
+    alist_t *(*calc[])(Square *sq) = {
+        calcNextMovePawn, calcNextMoveKnight, calcNextMoveBishop, calcNextMoveRook, calcNextMoveQueen, calcNextMoveKing,
+    };
+    return calc[sldr->type - 1](sq);
 }
 
 alist_t *calcNextMovePawn(Square *fsq) {
@@ -339,7 +323,7 @@ alist_t *calcNextMovePawn(Square *fsq) {
     int colmn = fsq->sldr->pos.col, row = fsq->sldr->pos.row, praws = 0;
     // number possible squares
 
-    nextSqs = create_alist(sizeof(size_t));
+    nextSqs = create_alist(sizeof(Square *));
     alist_reserve(nextSqs, 5);
     praws = (fsq->sldr->otherdt->NMOVES == ZERO) + 1;
 
@@ -673,13 +657,12 @@ void destroydata() {
 
 int16_t alist_push_sq(alist_t *list, Square *sq) {
     if (!list || !sq) return EXIT_FAILURE;
-    size_t square_address = (size_t)sq;
     sq->color = GREEN;
-    return alist_push(list, &square_address);
+    return alist_push(list, &sq);
 }
 
 Square *alist_sq_at(alist_t *list, size_t at) {
-    return (Square *)(*(size_t *)alist_at(list, at));
+    return *(Square **)alist_at(list, at);
 }
 
 void debug() {
