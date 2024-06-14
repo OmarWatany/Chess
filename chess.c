@@ -62,7 +62,7 @@ int moveSldr(Position pos) {
         }
         context->availableSqs = calcNextMove(*from);
         // colorList(context->availableSqs);
-        if (context->availableSqs == NULL || alist_is_empty(context->availableSqs)) {
+        if (context->availableSqs == NULL || alist_empty(context->availableSqs)) {
             colorBoardSquares();
             return 0;
         }
@@ -309,7 +309,8 @@ void mirrorBoard() {
 
 alist_t *calcNextMove(Square *sq) {
     Soldier *sldr = sq->sldr;
-    destroy_alist(&context->availableSqs);
+    alist_destroy(context->availableSqs);
+    free(context->availableSqs);
     if (!sldr) return NULL;
     alist_t *(*calc[])(Square *sq) = {
         calcNextMovePawn, calcNextMoveKnight, calcNextMoveBishop, calcNextMoveRook, calcNextMoveQueen, calcNextMoveKing,
@@ -602,7 +603,8 @@ alist_t *mergeList(alist_t *first, alist_t *second) {
     for (size_t i = 0; i < alist_size(second); i++) {
         alist_push(first, alist_at(second, i));
     }
-    destroy_alist(&second);
+    alist_destroy(second);
+    free(second);
     return nextSqs;
 }
 
@@ -616,7 +618,7 @@ Color *initColor() {
 
 void initgdata() {
     SetTraceLogLevel(LOG_NONE);
-    InitWindow(WIN_WIDTH, WIN_HEIGHT, "Chess");
+    InitWindow(800, 800, "Chess");
     SetTargetFPS(60);
     context = malloc(sizeof(Context));
     Set_t *white = createSet(WHITE_TEAM);
@@ -649,7 +651,8 @@ void destroydata() {
     for (int i = 0; i < 2; i++)
         free(context->board->sets[i]);
 
-    destroy_alist(&context->availableSqs);
+    alist_destroy(context->availableSqs);
+    free(context->availableSqs);
     free(context->colors);
     free(context->board);
     free(context);

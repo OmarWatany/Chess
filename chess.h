@@ -16,12 +16,12 @@
 #define CLEAR system("cls")
 #endif
 
-#define WIN_WIDTH 800.0f
-#define WIN_HEIGHT 800.0f
+// #define WIN_WIDTH 800.0f
+// #define WIN_HEIGHT 800.0f
 #define BOARD_WIDTH 800.0f
 #define BOARD_HEIGHT 800.0f
 #define BOARD_START 0.0f
-#define SQUARE_WIDTH (WIN_WIDTH / 8.0f)
+#define SQUARE_WIDTH (BOARD_WIDTH / 8.0f)
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 #define isOdd(x) ((x) % 2)
@@ -121,7 +121,6 @@ alist_t *mergeList(alist_t *, alist_t *);
 // closing functions
 void destroydata();
 void erroredEnd();
-void destroyAvList(alist_t *);
 void mirrorBoard();
 void colorBoardSquares();
 bool inBoundaries(int);
