@@ -1,6 +1,6 @@
 # Game
 
-![Game Picture](https://raw.githubusercontent.com/OmarWatany/Chess/master/assets/Chess_Game.png)
+![Game Picture](./assets/Chess_Game.png)
 
 ## TODO
 [ ] nonlegal moves 
