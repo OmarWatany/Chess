@@ -20,6 +20,7 @@
 #define BOARD_HEIGHT 800.0f
 #define BOARD_START 0.0f
 #define SQUARE_WIDTH (BOARD_WIDTH / 8.0f)
+#define INFOBAR_HEIGHT 80
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 #define isOdd(x) ((x) % 2)
@@ -37,12 +38,16 @@ typedef struct OtherData OtherData;
 typedef struct Soldier Soldier;
 typedef struct Square Square;
 typedef struct Board Board;
-// typedef struct alist_t alist_t;
 typedef struct Context Context;
+typedef struct Clock Clock;
 
 struct Position {
     int row;
     int col;
+};
+
+struct Clock {
+    double m, s;
 };
 
 struct OtherData {
@@ -66,6 +71,7 @@ struct Set_t {
     Soldier *soldiers;
     unsigned int count;
     TEAM_COLOR color;
+    Clock clk;
 };
 
 struct Square {

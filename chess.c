@@ -7,7 +7,6 @@
 #include <string.h>
 
 Context ctx;
-
 int main() {
     initgdata();
 
@@ -18,13 +17,42 @@ int main() {
     return 0;
 }
 
+Clock *blackClock;
+Clock *whiteClock;
+double globalTime = 0;
+
+bool isSecPassed(float seconds) {
+    if (GetTime() - globalTime >= seconds) {
+        globalTime = GetTime();
+        return true;
+    }
+    return false;
+}
+
+void incClock() {
+    Clock *temp = NULL;
+    if (ctx.ACTIVE == WHITE_TEAM)
+        temp = whiteClock;
+    else
+        temp = blackClock;
+    temp->s++;
+
+    if (60 == temp->s) {
+        temp->m++;
+        temp->s = 0;
+    }
+}
+
 void game() {
     int valid = 0;
     while (!WindowShouldClose()) {
         valid = 0;
-        ClearBackground(BROWN);
+        ClearBackground(BLACK);
         BeginDrawing();
         drawBoard();
+        if (isSecPassed(1)) {
+            incClock();
+        }
 
         if (IsKeyReleased(KEY_Q)) {
             EndDrawing();
@@ -50,7 +78,7 @@ Board *createBoard(Set_t *white, Set_t *black) {
     for (int i = 0; i < 8; i++) {
         for (int j = 0; j < 8; j++) {
             b->Squares[i][j].rectangle.x = j * SQUARE_WIDTH;
-            b->Squares[i][j].rectangle.y = i * SQUARE_WIDTH;
+            b->Squares[i][j].rectangle.y = i * SQUARE_WIDTH + INFOBAR_HEIGHT;
             b->Squares[i][j].rectangle.width = SQUARE_WIDTH;
             b->Squares[i][j].rectangle.height = SQUARE_WIDTH;
             b->Squares[i][j].occupied = false;
@@ -88,6 +116,7 @@ Set_t *createSet(TEAM_COLOR color) {
     Set_t *s = malloc(sizeof(Set_t));
     s->count = 16;
     s->color = color;
+    memset(&s->clk, 0, sizeof(Clock));
     s->soldiers = malloc(16 * sizeof(Soldier));
 
     SOLDIER_TYPE types[4] = {ROOK, KNIGHT, BISHOP, PAWN};
@@ -216,8 +245,46 @@ void mirrorBoard() {
     }
 }
 
+void drawClock(int fontSize) {
+    char *bclock = strdup(TextFormat("%02.0f:%02.0f", blackClock->m, blackClock->s));
+    char *wclock = strdup(TextFormat("%02.0f:%02.0f", whiteClock->m, whiteClock->s));
+    Vector2 bTextDim = MeasureTextEx(GetFontDefault(), bclock, fontSize, 0);
+    Vector2 wTextDim = MeasureTextEx(GetFontDefault(), wclock, fontSize, 0);
+
+    DrawText(bclock, (BOARD_WIDTH - bTextDim.x) / 2, INFOBAR_HEIGHT * 0.f + (INFOBAR_HEIGHT / 2.f - bTextDim.y) / 2,
+             fontSize, WHITE);
+    DrawText(wclock, (BOARD_WIDTH - wTextDim.x) / 2, INFOBAR_HEIGHT / 2.f + (INFOBAR_HEIGHT / 2.f - wTextDim.y) / 2,
+             fontSize, WHITE);
+    free(bclock);
+    free(wclock);
+}
+
+void drawInfoBar() {
+    int padding = 5;
+    int fontSize = 30;
+    drawClock(fontSize);
+    char *bText = strdup(TextFormat("BLACK : %d", ctx.board->sets[0]->count));
+    char *wText = strdup(TextFormat("WHITE : %d", ctx.board->sets[1]->count));
+
+    char *active = NULL;
+    if (ctx.ACTIVE == WHITE_TEAM)
+        active = strdup(TextFormat("Active : %s", "WHITE"));
+    else
+        active = strdup(TextFormat("Active : %s", "BLACK"));
+
+    int TextWidth = MAX(MeasureText(bText, fontSize), MeasureText(wText, fontSize));
+    DrawText(bText, BOARD_WIDTH - TextWidth * 1.1f, INFOBAR_HEIGHT * 0 + padding, fontSize, WHITE);
+    DrawText(wText, BOARD_WIDTH - TextWidth * 1.1f, INFOBAR_HEIGHT / 2 + padding, fontSize, WHITE);
+    DrawText(active, padding * 2, padding * 2, fontSize, WHITE);
+
+    free(bText);
+    free(wText);
+    free(active);
+}
+
 void drawBoard() {
     // draw ctx.board squares and soldiers
+    drawInfoBar();
     for (int i = 0; i < 8; i++) {
         for (int j = 0; j < 8; j++) {
             drawSq(&ctx.board->Squares[i][j]);
@@ -271,10 +338,12 @@ Color *initColor() {
 
 void initgdata() {
     SetTraceLogLevel(LOG_NONE);
-    InitWindow(800, 800, "Chess");
+    InitWindow(800, BOARD_HEIGHT + INFOBAR_HEIGHT, "Chess");
     SetTargetFPS(60);
     Set_t *white = createSet(WHITE_TEAM);
     Set_t *black = createSet(BLACK_TEAM);
+    blackClock = &black->clk;
+    whiteClock = &white->clk;
     // Set_t *white = onlyType(ROOK, WHITE_TEAM);
     // Set_t *black = onlyType(ROOK, BLACK_TEAM);
     ctx.colors = initColor();

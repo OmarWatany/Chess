@@ -73,7 +73,7 @@ void killEnemey(Soldier *sldr) {
 
 Position getArrPos(Vector2 from) {
     return (Position){
-        from.y / BOARD_WIDTH * 8,
+        (from.y - INFOBAR_HEIGHT) / BOARD_WIDTH * 8,
         from.x / BOARD_WIDTH * 8,
     };
 }
