@@ -16,8 +16,6 @@
 #define CLEAR system("cls")
 #endif
 
-// #define WIN_WIDTH 800.0f
-// #define WIN_HEIGHT 800.0f
 #define BOARD_WIDTH 800.0f
 #define BOARD_HEIGHT 800.0f
 #define BOARD_START 0.0f
@@ -84,7 +82,7 @@ struct Board {
 
 struct Context {
     Board *board;
-    alist_t *availableSqs;
+    alist_t availableSqs;
     Color *colors;
     TEAM_COLOR ACTIVE;
     CHANGE movementChange;
@@ -96,28 +94,29 @@ void killEnemey(Soldier *sldr);
 Set_t *createSet(TEAM_COLOR color);
 Board *createBoard(Set_t *white, Set_t *black);
 // next position functions
-alist_t *calcNextMove(Square *sq);
-alist_t *calcNextMovePawn(Square *fsq);
-alist_t *calcNextMoveKnight(Square *fsq);
-alist_t *calcNextMoveRook(Square *fsq);
-alist_t *calcNextMoveBishop(Square *fsq);
-alist_t *calcNextMoveQueen(Square *fsq);
-alist_t *calcNextMoveKing(Square *fsq);
+alist_t calcNextMove(Square *sq);
+alist_t calcNextMovePawn(Square *fsq);
+alist_t calcNextMoveKnight(Square *fsq);
+alist_t calcNextMoveRook(Square *fsq);
+alist_t calcNextMoveBishop(Square *fsq);
+alist_t calcNextMoveQueen(Square *fsq);
+alist_t calcNextMoveKing(Square *fsq);
 bool isEnemy(Square *from, Square *to);
 // move functions
 Square *chooseSquare(Position pos);
 Position choosePos(CHANGE change);
-Position getPos();
+Position getArrPos(Vector2 from);
 Soldier *selectSldr(Position SqPos);
 int moveSldr(Position pos);
 bool isAvailable(Square *sq);
 void changeActive();
+void cancelMovment();
 // displaying functions
 void drawBoard();
 void drawSq(Square *sq);
 void displayNextSqsList();
 // av list functions
-alist_t *mergeList(alist_t *, alist_t *);
+alist_t mergeList(alist_t *, alist_t *);
 // closing functions
 void destroydata();
 void erroredEnd();
@@ -129,8 +128,13 @@ void drawWhileWhite();
 void drawWhileBlack();
 void initgdata();
 
+int16_t alist_push_sq(alist_t *list, Square *sq);
+Square *alist_sq_at(alist_t *list, size_t at);
+
 // for testing
-//
 Set_t *onlyType(SOLDIER_TYPE t, TEAM_COLOR color);
+
+// global variables
+extern Context ctx;
 
 #endif // !_CHESS_HEِِِADER

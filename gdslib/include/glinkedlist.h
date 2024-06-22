@@ -8,11 +8,11 @@ extern "C" {
 #include "gds_types.h"
 #include <stdlib.h>
 
-llist_t    *create_list(size_t item_size);
-list_itr_t *create_list_iterator(llist_t *list);
+llist_t    *list_create(size_t item_size);
+list_itr_t *list_itr_create(llist_t *list);
 
-void init_list(llist_t *list, size_t item_size);
-void init_list_iterator(list_itr_t *it, llist_t *list);
+void list_init(llist_t *list, size_t item_size);
+void list_itr_init(list_itr_t *it, llist_t *list);
 
 size_t   list_item_size(llist_t *list);
 lnode_t *list_head(llist_t *list);

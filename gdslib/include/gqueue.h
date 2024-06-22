@@ -7,8 +7,8 @@
 extern "C" {
 #endif // cpp
 
-queue_t *create_queue(size_t item_size);
-void     init_queue(queue_t *queue, size_t item_size);
+queue_t *queue_create(size_t item_size);
+void     queue_init(queue_t *queue, size_t item_size);
 
 int16_t enqueue(queue_t *queue, gdata_t data);
 int16_t dequeue(queue_t *queue);

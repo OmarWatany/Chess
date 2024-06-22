@@ -11,11 +11,11 @@ extern "C" {
 typedef void *gdata_t;
 
 typedef struct {
-    uintptr_t data_address;
+    gdata_t data;
 } anode_t;
 
 typedef struct {
-    uintptr_t data_address;
+    gdata_t   data;
     uintptr_t link;
 } lnode_t;
 typedef struct tnode_t tnode_t;
