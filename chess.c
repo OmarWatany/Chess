@@ -245,37 +245,42 @@ void mirrorBoard() {
     }
 }
 
-void drawClock(int fontSize) {
-    char *bclock = strdup(TextFormat("%02.0f:%02.0f", blackClock->m, blackClock->s));
-    char *wclock = strdup(TextFormat("%02.0f:%02.0f", whiteClock->m, whiteClock->s));
+float drawClock(int fontSize) {
+    int margin = 20;
+    char *bclock = strdup(TextFormat(" _ %02.0f:%02.0f ", blackClock->m, blackClock->s));
+    char *wclock = strdup(TextFormat(" _ %02.0f:%02.0f ", whiteClock->m, whiteClock->s));
     Vector2 bTextDim = MeasureTextEx(GetFontDefault(), bclock, fontSize, 0);
     Vector2 wTextDim = MeasureTextEx(GetFontDefault(), wclock, fontSize, 0);
+    float TextWidth = MAX(bTextDim.x, wTextDim.x) + margin;
 
-    DrawText(bclock, (BOARD_WIDTH - bTextDim.x) / 2, INFOBAR_HEIGHT * 0.f + (INFOBAR_HEIGHT / 2.f - bTextDim.y) / 2,
-             fontSize, WHITE);
-    DrawText(wclock, (BOARD_WIDTH - wTextDim.x) / 2, INFOBAR_HEIGHT / 2.f + (INFOBAR_HEIGHT / 2.f - wTextDim.y) / 2,
-             fontSize, WHITE);
+    DrawText(bclock, BOARD_WIDTH - TextWidth, INFOBAR_HEIGHT * 0.f + (INFOBAR_HEIGHT / 2.f - bTextDim.y) / 2, fontSize,
+             WHITE);
+    DrawText(wclock, BOARD_WIDTH - TextWidth, INFOBAR_HEIGHT / 2.f + (INFOBAR_HEIGHT / 2.f - wTextDim.y) / 2, fontSize,
+             WHITE);
     free(bclock);
     free(wclock);
+    return TextWidth;
 }
 
 void drawInfoBar() {
-    int padding = 5;
+    int margin = 5;
     int fontSize = 30;
-    drawClock(fontSize);
+    float clkWidth = drawClock(fontSize);
     char *bText = strdup(TextFormat("BLACK : %d", ctx.board->sets[0]->count));
     char *wText = strdup(TextFormat("WHITE : %d", ctx.board->sets[1]->count));
-
     char *active = NULL;
     if (ctx.ACTIVE == WHITE_TEAM)
         active = strdup(TextFormat("Active : %s", "WHITE"));
     else
         active = strdup(TextFormat("Active : %s", "BLACK"));
 
-    int TextWidth = MAX(MeasureText(bText, fontSize), MeasureText(wText, fontSize));
-    DrawText(bText, BOARD_WIDTH - TextWidth * 1.1f, INFOBAR_HEIGHT * 0 + padding, fontSize, WHITE);
-    DrawText(wText, BOARD_WIDTH - TextWidth * 1.1f, INFOBAR_HEIGHT / 2 + padding, fontSize, WHITE);
-    DrawText(active, padding * 2, padding * 2, fontSize, WHITE);
+    Vector2 bTextSize = MeasureTextEx(GetFontDefault(), bText, fontSize, 0);
+    Vector2 wTextSize = MeasureTextEx(GetFontDefault(), wText, fontSize, 0);
+    int TextWidth = MAX(bTextSize.x, wTextSize.x) + margin * 3;
+
+    DrawText(bText, BOARD_WIDTH - clkWidth - TextWidth * 1.1f, INFOBAR_HEIGHT * 0 + margin, fontSize, WHITE);
+    DrawText(wText, BOARD_WIDTH - clkWidth - TextWidth * 1.1f, INFOBAR_HEIGHT / 2 + margin, fontSize, WHITE);
+    DrawText(active, margin * 2, margin * 2, fontSize, WHITE);
 
     free(bText);
     free(wText);

@@ -94,13 +94,12 @@ alist_t calcNextMove(Square *sq) {
 
 alist_t calcNextMovePawn(Square *fsq) {
     alist_t nextSqs = {0};
-    // alist_init(&nextSqs, sizeof(position *));
     alist_init(&nextSqs, sizeof(Square *));
+    alist_reserve(&nextSqs, 5);
     Square *nsq = NULL, *enmsq = NULL;
     int colmn = fsq->sldr->pos.col, row = fsq->sldr->pos.row, praws = 0;
-    // number possible squares
 
-    alist_reserve(&nextSqs, 5);
+    // Number of possible squares
     praws = (fsq->sldr->otherdt->NMOVES == ZERO) + 1;
 
     Square *squares[8][8] = {0};
@@ -110,14 +109,15 @@ alist_t calcNextMovePawn(Square *fsq) {
 
     // check if there is victims in corners or beside him
     // check the next rows
-    for (int i = 1; i <= praws && !squares[row - 1][colmn]->occupied; i++) {
+    for (int i = 1; i <= praws && inBoundaries(row - 1) && !squares[row - 1][colmn]->occupied; i++) {
         nsq = squares[row - i][colmn];
         if (!nsq->occupied) alist_push_sq(&nextSqs, nsq);
     }
     // check the next colmns
-    for (int i = -1; i <= 1; i++) {
-        if (i != 0) {
-            nsq = squares[row - 1][colmn + i];
+    for (int c = -1; c <= 1; c++) {
+        if (!inBoundaries(colmn + c)) continue;
+        if (c != 0 && inBoundaries(row - 1)) {
+            nsq = squares[row - 1][colmn + c];
             if (isEnemy(fsq, nsq)) alist_push_sq(&nextSqs, nsq);
         }
     }
@@ -132,7 +132,7 @@ alist_t calcNextMovePawn(Square *fsq) {
             if (i != 0 && inBoundaries(colmn + i)) {
                 enmsq = squares[row][colmn + i];
                 nsq = squares[row - 1][colmn + i];
-                if (isEnemy(fsq, enmsq) && enmsq->sldr->otherdt->enpassant) {
+                if (isEnemy(fsq, enmsq) && enmsq->sldr->type == PAWN && enmsq->sldr->otherdt->enpassant) {
                     alist_push_sq(&nextSqs, nsq);
                 }
             }
@@ -152,12 +152,12 @@ alist_t calcNextMoveKnight(Square *fsq) {
     // set boundries
 
     Square *n = NULL;
-    for (int col = -2; col <= 2; col++) {
-        ncol = colmn + col;
-        if (col == 0 || !inBoundaries(ncol)) continue;
+    for (int c = -2; c <= 2; c++) {
+        ncol = colmn + c;
+        if (c == 0 || !inBoundaries(ncol)) continue;
         for (int r = -1; r <= 1; r++) {
             if (r == 0) continue;
-            if (!(col % 2)) {
+            if (!(c % 2)) {
                 nrow = row + r;
             } else {
                 nrow = row + (2 * r);
