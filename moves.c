@@ -1,6 +1,11 @@
 #include "chess.h"
 #include "gdslib/include/garraylist.h"
 
+float cLerp(float start, float end, float amount) {
+    float result = start + amount * (end - start);
+    return result;
+}
+
 int moveSldr(Position pos) {
     Square **from = &ctx.fromSquare, *next;
     switch (ctx.movementChange) {
@@ -12,7 +17,6 @@ int moveSldr(Position pos) {
             return 0;
         }
         ctx.availableSqs = calcNextMove(*from);
-        // colorList(ctx.availableSqs);
         if (alist_empty(&ctx.availableSqs)) {
             colorBoardSquares();
             return 0;
@@ -47,8 +51,8 @@ int moveSldr(Position pos) {
                 if ((*from)->sldr->otherdt->NMOVES < MORE_THAN_ONE) ((*from)->sldr->otherdt->NMOVES)++;
 
                 if (pos.row == 2 && pos.col != (*from)->sldr->pos.col) {
-                    killEnemey(ctx.board->Squares[(*from)->sldr->pos.row][pos.col].sldr);
-                    ctx.board->Squares[(*from)->sldr->pos.row][pos.col].occupied = false;
+                    killEnemey(ctx.board->Squares[(int)(*from)->sldr->pos.row][(int)pos.col].sldr);
+                    ctx.board->Squares[(int)(*from)->sldr->pos.row][(int)pos.col].occupied = false;
                 }
             }
 
@@ -56,6 +60,15 @@ int moveSldr(Position pos) {
             next->sldr = (*from)->sldr;
             next->occupied = true;
             (*from)->sldr = NULL;
+
+            // while (next->sldr->pos.col != pos.col)
+            //     next->sldr->pos.col++;
+            // while (next->sldr->pos.row != pos.row) {
+            //     next->sldr->pos.row += 2;
+            //     DrawTexture(next->sldr->shapText, sldrPos.x, sldrPos.y, WHITE);
+            // }
+            // next->sldr->pos.col = cLerp(next->sldr->pos.col, pos.col, 0.1f);
+            // next->sldr->pos.row = cLerp(next->sldr->pos.row, pos.row, 0.1f);
             next->sldr->pos = pos;
             ctx.movementChange = FROM;
             colorBoardSquares();
@@ -79,7 +92,7 @@ Position getArrPos(Vector2 from) {
 }
 
 Soldier *selectSldr(Position SqPos) {
-    return ctx.board->Squares[SqPos.row][SqPos.col].sldr;
+    return ctx.board->Squares[(int)SqPos.row][(int)SqPos.col].sldr;
 }
 
 alist_t calcNextMove(Square *sq) {
@@ -317,7 +330,7 @@ bool isEnemy(Square *from, Square *to) {
 
 Square *chooseSquare(Position pos) {
     if (pos.row != 10) {
-        return &(ctx.board->Squares[pos.row][pos.col]);
+        return &(ctx.board->Squares[(int)pos.row][(int)pos.col]);
     } else
         return 0;
 }

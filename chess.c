@@ -1,3 +1,6 @@
+#define ARENA_IMPLEMENTATION
+#include "./arena.h"
+
 #include "./chess.h"
 #include "data.h"
 #include "gdslib/include/garraylist.h"
@@ -6,7 +9,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+Arena global_arena;
 Context ctx;
+
 int main() {
     initgdata();
 
@@ -70,7 +75,7 @@ void game() {
 }
 
 Board *createBoard(Set_t *white, Set_t *black) {
-    Board *b = malloc(sizeof(Board));
+    Board *b = arena_alloc(&global_arena, sizeof(Board));
     b->sets[0] = black;
     b->sets[1] = white;
 
@@ -113,11 +118,15 @@ Board *createBoard(Set_t *white, Set_t *black) {
 }
 
 Set_t *createSet(TEAM_COLOR color) {
-    Set_t *s = malloc(sizeof(Set_t));
+    Set_t *s = arena_alloc(&global_arena, sizeof(Set_t));
+    if (!s) {
+        perror("no arena");
+        exit(1);
+    }
     s->count = 16;
     s->color = color;
     memset(&s->clk, 0, sizeof(Clock));
-    s->soldiers = malloc(16 * sizeof(Soldier));
+    s->soldiers = arena_alloc(&global_arena, 16 * sizeof(Soldier));
 
     SOLDIER_TYPE types[4] = {ROOK, KNIGHT, BISHOP, PAWN};
     switch (color) {
@@ -150,25 +159,26 @@ Set_t *createSet(TEAM_COLOR color) {
         s->soldiers[i].TEAM = s;
         s->soldiers[i].State = LIVE;
         s->soldiers[i].otherdt = NULL;
+        if (s->soldiers[i].type == PAWN || s->soldiers[i].type == KING)
+            s->soldiers[i].otherdt = arena_alloc(&global_arena, sizeof(OtherData));
         if (s->soldiers[i].type == PAWN) {
-            s->soldiers[i].otherdt = malloc(sizeof(OtherData));
             s->soldiers[i].otherdt->NMOVES = ZERO;
             s->soldiers[i].otherdt->enpassant = false;
         } else if (s->soldiers[i].type == KING) {
-            s->soldiers[i].otherdt = malloc(sizeof(OtherData));
             s->soldiers[i].otherdt->NMOVES = ZERO;
             s->soldiers[i].otherdt->check = false;
         }
     }
-    char *sldr_types[] = {"pawn", "knight", "bishop", "rook", "queen", "king"};
-    char *team_color[] = {"white", "black"};
+    char *sldr_types[] = {
+        [PAWN] = "pawn", [KNIGHT] = "knight", [BISHOP] = "bishop", [ROOK] = "rook", [QUEEN] = "queen", [KING] = "king"};
+    char *team_color[] = {[WHITE_TEAM] = "white", [BLACK_TEAM] = "black"};
     float scale_factor = 0.85f;
     for (int i = 0; i < 16; i++) {
         Image soldierImage = {0};
         soldierImage = LoadImage(TextFormat("./assets/"
                                             "128px/"
                                             "%s_%s_png_shadow.png",
-                                            team_color[s->color], sldr_types[s->soldiers[i].type - 1]));
+                                            team_color[s->color], sldr_types[s->soldiers[i].type]));
         ImageResize(&soldierImage, SQUARE_WIDTH * scale_factor, SQUARE_WIDTH * scale_factor);
         s->soldiers[i].shapText = LoadTextureFromImage(soldierImage);
         UnloadImage(soldierImage);
@@ -247,8 +257,8 @@ void mirrorBoard() {
 
 float drawClock(int fontSize) {
     int margin = 20;
-    char *bclock = strdup(TextFormat(" _ %02.0f:%02.0f ", blackClock->m, blackClock->s));
-    char *wclock = strdup(TextFormat(" _ %02.0f:%02.0f ", whiteClock->m, whiteClock->s));
+    const char *bclock = TextFormat(" _ %02.0f:%02.0f ", blackClock->m, blackClock->s);
+    const char *wclock = TextFormat(" _ %02.0f:%02.0f ", whiteClock->m, whiteClock->s);
     Vector2 bTextDim = MeasureTextEx(GetFontDefault(), bclock, fontSize, 0);
     Vector2 wTextDim = MeasureTextEx(GetFontDefault(), wclock, fontSize, 0);
     float TextWidth = MAX(bTextDim.x, wTextDim.x) + margin;
@@ -257,8 +267,6 @@ float drawClock(int fontSize) {
              WHITE);
     DrawText(wclock, BOARD_WIDTH - TextWidth, INFOBAR_HEIGHT / 2.f + (INFOBAR_HEIGHT / 2.f - wTextDim.y) / 2, fontSize,
              WHITE);
-    free(bclock);
-    free(wclock);
     return TextWidth;
 }
 
@@ -266,13 +274,17 @@ void drawInfoBar() {
     int margin = 5;
     int fontSize = 30;
     float clkWidth = drawClock(fontSize);
-    char *bText = strdup(TextFormat("BLACK : %d", ctx.board->sets[0]->count));
-    char *wText = strdup(TextFormat("WHITE : %d", ctx.board->sets[1]->count));
-    char *active = NULL;
-    if (ctx.ACTIVE == WHITE_TEAM)
-        active = strdup(TextFormat("Active : %s", "WHITE"));
-    else
-        active = strdup(TextFormat("Active : %s", "BLACK"));
+
+    const char *black = "BLACK";
+    const char *white = "WHITE";
+
+    const char *active_c = ctx.ACTIVE == WHITE_TEAM ? white : black;
+    const char *active = NULL;
+    active = TextFormat("Active : %s", active_c);
+    DrawText(active, margin * 2, margin * 2, fontSize, WHITE);
+
+    const char *bText = TextFormat("%s : %d", black, ctx.board->sets[0]->count);
+    const char *wText = TextFormat("%s : %d", white, ctx.board->sets[1]->count);
 
     Vector2 bTextSize = MeasureTextEx(GetFontDefault(), bText, fontSize, 0);
     Vector2 wTextSize = MeasureTextEx(GetFontDefault(), wText, fontSize, 0);
@@ -280,11 +292,6 @@ void drawInfoBar() {
 
     DrawText(bText, BOARD_WIDTH - clkWidth - TextWidth * 1.1f, INFOBAR_HEIGHT * 0 + margin, fontSize, WHITE);
     DrawText(wText, BOARD_WIDTH - clkWidth - TextWidth * 1.1f, INFOBAR_HEIGHT / 2 + margin, fontSize, WHITE);
-    DrawText(active, margin * 2, margin * 2, fontSize, WHITE);
-
-    free(bText);
-    free(wText);
-    free(active);
 }
 
 void drawBoard() {
@@ -334,7 +341,7 @@ alist_t mergeList(alist_t *first, alist_t *second) {
 }
 
 Color *initColor() {
-    Color *colors = malloc(3 * sizeof(char *));
+    Color *colors = arena_alloc(&global_arena, 3 * sizeof(char *));
     colors[0] = DARKBROWN;
     colors[1] = BEIGE;
     colors[2] = GREEN;
@@ -342,6 +349,7 @@ Color *initColor() {
 }
 
 void initgdata() {
+    arena_init(&global_arena, 1024 * 2);
     SetTraceLogLevel(LOG_NONE);
     InitWindow(800, BOARD_HEIGHT + INFOBAR_HEIGHT, "Chess");
     SetTargetFPS(60);
@@ -359,28 +367,16 @@ void initgdata() {
     colorBoardSquares();
 }
 
+// i need an arena
 void destroydata() {
     for (int i = 0; i < 16; i++) {
         UnloadTexture(ctx.board->sets[0]->soldiers[i].shapText);
         UnloadTexture(ctx.board->sets[1]->soldiers[i].shapText);
     }
     CloseWindow();
-    for (int i = 0; i < 8; i++) {
-        free(ctx.board->sets[0]->soldiers[i + 8].otherdt);
-        free(ctx.board->sets[1]->soldiers[i].otherdt);
-    }
-    free(ctx.board->sets[0]->soldiers[4].otherdt);
-    free(ctx.board->sets[1]->soldiers[12].otherdt);
-
-    free(ctx.board->sets[0]->soldiers);
-    free(ctx.board->sets[1]->soldiers);
-
-    for (int i = 0; i < 2; i++)
-        free(ctx.board->sets[i]);
+    arena_destroy(&global_arena);
 
     alist_destroy(&ctx.availableSqs);
-    free(ctx.colors);
-    free(ctx.board);
 }
 
 int16_t alist_push_sq(alist_t *list, Square *sq) {
