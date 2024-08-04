@@ -5,7 +5,7 @@
 #include <unistd.h>
 
 void load(Context *context) {
-    char *file = "./.data";
+    char *file = ".data";
     FILE *fd = NULL;
     fd = fopen(file, "rb");
     TEAM_COLOR *act = malloc(sizeof(TEAM_COLOR));
@@ -75,9 +75,9 @@ void readSq(FILE *file, Square *sq) {
 }
 
 void save(Context *context) {
-    char *file = "./.data";
+    char *file = ".data";
     FILE *fd = NULL;
-    fd = fopen(file, "wb");
+    fd = fopen(file, "wb+");
     if (fd) {
         Set_t *white = context->board->sets[1];
         Set_t *black = context->board->sets[0];

@@ -1,10 +1,10 @@
 #define ARENA_IMPLEMENTATION
-#include "./arena.h"
 
-#include "./chess.h"
+#include "chess.h"
+#include "arena.h"
 #include "data.h"
-#include "gdslib/include/garraylist.h"
-#include "raylib/include/raylib.h"
+#include "garraylist.h"
+#include "raylib.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,8 +22,8 @@ int main() {
     return 0;
 }
 
-Clock *blackClock;
-Clock *whiteClock;
+Timer *blackTimer;
+Timer *whiteTimer;
 double globalTime = 0;
 
 bool isSecPassed(float seconds) {
@@ -34,12 +34,12 @@ bool isSecPassed(float seconds) {
     return false;
 }
 
-void incClock() {
-    Clock *temp = NULL;
+void incTimer() {
+    Timer *temp = NULL;
     if (ctx.ACTIVE == WHITE_TEAM)
-        temp = whiteClock;
+        temp = whiteTimer;
     else
-        temp = blackClock;
+        temp = blackTimer;
     temp->s++;
 
     if (60 == temp->s) {
@@ -56,7 +56,7 @@ void game() {
         BeginDrawing();
         drawBoard();
         if (isSecPassed(1)) {
-            incClock();
+            incTimer();
         }
 
         if (IsKeyReleased(KEY_Q)) {
@@ -125,7 +125,7 @@ Set_t *createSet(TEAM_COLOR color) {
     }
     s->count = 16;
     s->color = color;
-    memset(&s->clk, 0, sizeof(Clock));
+    memset(&s->clk, 0, sizeof(Timer));
     s->soldiers = arena_alloc(&global_arena, 16 * sizeof(Soldier));
 
     SOLDIER_TYPE types[4] = {ROOK, KNIGHT, BISHOP, PAWN};
@@ -255,10 +255,10 @@ void mirrorBoard() {
     }
 }
 
-float drawClock(int fontSize) {
+float drawTimer(int fontSize) {
     int margin = 20;
-    const char *bclock = TextFormat(" _ %02.0f:%02.0f ", blackClock->m, blackClock->s);
-    const char *wclock = TextFormat(" _ %02.0f:%02.0f ", whiteClock->m, whiteClock->s);
+    const char *bclock = TextFormat(" _ %02.0f:%02.0f ", blackTimer->m, blackTimer->s);
+    const char *wclock = TextFormat(" _ %02.0f:%02.0f ", whiteTimer->m, whiteTimer->s);
     Vector2 bTextDim = MeasureTextEx(GetFontDefault(), bclock, fontSize, 0);
     Vector2 wTextDim = MeasureTextEx(GetFontDefault(), wclock, fontSize, 0);
     float TextWidth = MAX(bTextDim.x, wTextDim.x) + margin;
@@ -273,7 +273,7 @@ float drawClock(int fontSize) {
 void drawInfoBar() {
     int margin = 5;
     int fontSize = 30;
-    float clkWidth = drawClock(fontSize);
+    float clkWidth = drawTimer(fontSize);
 
     const char *black = "BLACK";
     const char *white = "WHITE";
@@ -355,8 +355,8 @@ void initgdata() {
     SetTargetFPS(60);
     Set_t *white = createSet(WHITE_TEAM);
     Set_t *black = createSet(BLACK_TEAM);
-    blackClock = &black->clk;
-    whiteClock = &white->clk;
+    blackTimer = &black->clk;
+    whiteTimer = &white->clk;
     // Set_t *white = onlyType(ROOK, WHITE_TEAM);
     // Set_t *black = onlyType(ROOK, BLACK_TEAM);
     ctx.colors = initColor();

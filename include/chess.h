@@ -1,8 +1,8 @@
 #ifndef _CHESS_HEِِِADER
 #define _CHESS_HEِِِADER
 
-#include "gdslib/include/garraylist.h"
-#include "raylib/include/raylib.h"
+#include "garraylist.h"
+#include "raylib.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,14 +39,14 @@ typedef struct Soldier Soldier;
 typedef struct Square Square;
 typedef struct Board Board;
 typedef struct Context Context;
-typedef struct Clock Clock;
+typedef struct Timer Timer;
 
 struct Position {
     int row;
     int col;
 };
 
-struct Clock {
+struct Timer {
     double m, s;
 };
 
@@ -71,7 +71,7 @@ struct Set_t {
     Soldier *soldiers;
     unsigned int count;
     TEAM_COLOR color;
-    Clock clk;
+    Timer clk;
 };
 
 struct Square {

@@ -1,5 +1,5 @@
 #include "chess.h"
-#include "gdslib/include/garraylist.h"
+#include "garraylist.h"
 
 float cLerp(float start, float end, float amount) {
     float result = start + amount * (end - start);
