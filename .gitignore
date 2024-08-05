@@ -12,4 +12,5 @@ _deps
 CMakeUserPresets.json
 .data
 server
+chess
 .cache/
