@@ -1,39 +1,33 @@
 #include "data.h"
 #include "chess.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
 
 void load(Context *context) {
     char *file = ".data";
     FILE *fd = NULL;
     fd = fopen(file, "rb");
-    TEAM_COLOR *act = malloc(sizeof(TEAM_COLOR));
+    TEAM *act = &context->ACTIVE;
     if (fd) {
-        Set_t *black = context->board->sets[0];
-        Set_t *white = context->board->sets[1];
+        Set_t *black = &context->board.sets[0];
+        Set_t *white = &context->board.sets[1];
 
-        fread(act, sizeof(TEAM_COLOR), 1, fd);
+        fread(act, sizeof(TEAM), 1, fd);
         if (*act != context->ACTIVE) {
             mirrorBoard();
         }
-        context->ACTIVE = *act;
 
         for (int i = 0; i < 8; i++) {
             for (int j = 0; j < 8; j++) {
                 // printf("%d %d ", i, j);
-                readSq(fd, &context->board->Squares[i][j]);
+                readSq(fd, &context->board.Squares[i][j]);
             }
         }
         // sleep(240);
         readSet(fd, white, context);
         readSet(fd, black, context);
-
     } else {
         perror("coudn't open file or not found");
     }
     fclose(fd);
-    free(act);
 }
 // for each square in the board saev
 // sldr pos , sq occupation  , set count,
@@ -46,7 +40,7 @@ void readSet(FILE *file, Set_t *s, Context *context) {
         readSldr(file, &s->soldiers[i]);
         col = s->soldiers[i].pos.col;
         row = s->soldiers[i].pos.row;
-        context->board->Squares[row][col].sldr = &s->soldiers[i];
+        context->board.Squares[row][col].sldr = &s->soldiers[i];
     }
 }
 
@@ -79,14 +73,14 @@ void save(Context *context) {
     FILE *fd = NULL;
     fd = fopen(file, "wb+");
     if (fd) {
-        Set_t *white = context->board->sets[1];
-        Set_t *black = context->board->sets[0];
+        Set_t *white = &context->board.sets[1];
+        Set_t *black = &context->board.sets[0];
 
         fflush(fd);
-        fwrite(&context->ACTIVE, sizeof(TEAM_COLOR), 1, fd);
+        fwrite(&context->ACTIVE, sizeof(TEAM), 1, fd);
         for (int i = 0; i < 8; i++) {
             for (int j = 0; j < 8; j++) {
-                writeSq(fd, &context->board->Squares[i][j]);
+                writeSq(fd, &context->board.Squares[i][j]);
             }
         }
         writeSet(fd, white);

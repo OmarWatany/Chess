@@ -5,33 +5,21 @@
 #include "data.h"
 #include "garraylist.h"
 #include "raylib.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 Arena global_arena;
 Context ctx;
+Timer *blackTimer, *whiteTimer;
+double globalTime = 0;
 
 int main() {
-    initgdata();
-
+    initGameData();
     game();
-
-    destroydata();
-
+    destroyData();
     return 0;
 }
 
-Timer *blackTimer;
-Timer *whiteTimer;
-double globalTime = 0;
-
-bool isSecPassed(float seconds) {
-    if (GetTime() - globalTime >= seconds) {
-        globalTime = GetTime();
-        return true;
-    }
-    return false;
+static inline bool isSecPassed(double previous, float seconds) {
+    return (GetTime() - previous >= seconds);
 }
 
 void incTimer() {
@@ -55,7 +43,8 @@ void game() {
         ClearBackground(BLACK);
         BeginDrawing();
         drawBoard();
-        if (isSecPassed(1)) {
+        if (isSecPassed(globalTime, 1)) {
+            globalTime = GetTime();
             incTimer();
         }
 
@@ -74,62 +63,59 @@ void game() {
     }
 }
 
-Board *createBoard(Set_t *white, Set_t *black) {
-    Board *b = arena_alloc(&global_arena, sizeof(Board));
-    b->sets[0] = black;
-    b->sets[1] = white;
+void initBoard(Board *b) {
+    Set_t *black = &b->sets[0], *white = &b->sets[1];
+    initSet(&b->sets[0], BLACK_TEAM);
+    initSet(&b->sets[1], WHITE_TEAM);
+    // onlyType(white, ROOK, WHITE_TEAM);
+    // onlyType(black, ROOK, BLACK_TEAM);
 
     // Initialize the square & set positions
-    for (int i = 0; i < 8; i++) {
-        for (int j = 0; j < 8; j++) {
-            b->Squares[i][j].rectangle.x = j * SQUARE_WIDTH;
-            b->Squares[i][j].rectangle.y = i * SQUARE_WIDTH + INFOBAR_HEIGHT;
-            b->Squares[i][j].rectangle.width = SQUARE_WIDTH;
-            b->Squares[i][j].rectangle.height = SQUARE_WIDTH;
-            b->Squares[i][j].occupied = false;
-            b->Squares[i][j].sldr = NULL;
-            b->Squares[i][j].color = ctx.colors[!isEven(i + j)];
+    for (int y = 0; y < 8; y++) {
+        for (int x = 0; x < 8; x++) {
+            b->Squares[y][x].pos.col = x * SQUARE_WIDTH;
+            b->Squares[y][x].pos.row = y * SQUARE_WIDTH + INFOBAR_HEIGHT;
+            b->Squares[y][x].occupied = false;
+            b->Squares[y][x].sldr = NULL;
+            b->Squares[y][x].color = ctx.colors[isOdd(y + x)];
         }
     }
 
-    for (int i = 0; i < 2; i++) {
-        for (int j = 0; j < 8; j++) {
-            if (black->soldiers[(i * 8) + j].State == LIVE) {
-                b->Squares[i][j].occupied = true;
-                b->Squares[i][j].sldr = &(black->soldiers[(i * 8) + j]);
-                b->Squares[i][j].sldr->pos.col = j;
-                b->Squares[i][j].sldr->pos.row = i;
+    for (int y = 0; y < 2; y++) {
+        for (int x = 0; x < 8; x++) {
+            if (black->soldiers[(y * 8) + x].State == LIVE) {
+                b->Squares[y][x].occupied = true;
+                b->Squares[y][x].sldr = &(black->soldiers[(y * 8) + x]);
+                b->Squares[y][x].sldr->pos.col = x;
+                b->Squares[y][x].sldr->pos.row = y;
             }
         }
     }
 
-    for (int i = 6; i < 8; i++) {
-        for (int j = 0; j < 8; j++) {
-            if (white->soldiers[((i - 6) * 8) + j].State == LIVE) {
-                b->Squares[i][j].occupied = true;
-                b->Squares[i][j].sldr = &(white->soldiers[((i - 6) * 8) + j]);
-                b->Squares[i][j].sldr->pos.col = j;
-                b->Squares[i][j].sldr->pos.row = i;
+    for (int y = 6; y < 8; y++) {
+        for (int x = 0; x < 8; x++) {
+            if (white->soldiers[((y - 6) * 8) + x].State == LIVE) {
+                b->Squares[y][x].occupied = true;
+                b->Squares[y][x].sldr = &(white->soldiers[((y - 6) * 8) + x]);
+                b->Squares[y][x].sldr->pos.col = x;
+                b->Squares[y][x].sldr->pos.row = y;
             }
         }
     }
-
-    return b;
 }
 
-Set_t *createSet(TEAM_COLOR color) {
-    Set_t *s = arena_alloc(&global_arena, sizeof(Set_t));
+void initSet(Set_t *s, TEAM teamColor) {
     if (!s) {
-        perror("no arena");
+        perror("no set");
         exit(1);
     }
     s->count = 16;
-    s->color = color;
-    memset(&s->clk, 0, sizeof(Timer));
-    s->soldiers = arena_alloc(&global_arena, 16 * sizeof(Soldier));
+    s->teamColor = teamColor;
+    memset(&s->timer, 0, sizeof(Timer));
+    // s->soldiers = arena_alloc(&global_arena, 16 * sizeof(Soldier));
 
     SOLDIER_TYPE types[4] = {ROOK, KNIGHT, BISHOP, PAWN};
-    switch (color) {
+    switch (teamColor) {
     case BLACK_TEAM:
         for (int i = 0; i < 3; i++) {
             s->soldiers[i].type = types[i];
@@ -156,7 +142,7 @@ Set_t *createSet(TEAM_COLOR color) {
 
     // Soldier soldiers[16];
     for (int i = 0; i < 16; i++) {
-        s->soldiers[i].TEAM = s;
+        s->soldiers[i].team = s;
         s->soldiers[i].State = LIVE;
         s->soldiers[i].otherdt = NULL;
         if (s->soldiers[i].type == PAWN || s->soldiers[i].type == KING)
@@ -178,24 +164,21 @@ Set_t *createSet(TEAM_COLOR color) {
         soldierImage = LoadImage(TextFormat("./assets/"
                                             "128px/"
                                             "%s_%s_png_shadow.png",
-                                            team_color[s->color], sldr_types[s->soldiers[i].type]));
+                                            team_color[s->teamColor], sldr_types[s->soldiers[i].type]));
         ImageResize(&soldierImage, SQUARE_WIDTH * scale_factor, SQUARE_WIDTH * scale_factor);
         s->soldiers[i].shapText = LoadTextureFromImage(soldierImage);
         UnloadImage(soldierImage);
     }
-
-    return s;
 }
 
-Set_t *onlyType(SOLDIER_TYPE t, TEAM_COLOR color) {
-    Set_t *s = createSet(color);
+void onlyType(Set_t *s, SOLDIER_TYPE t, TEAM color) {
+    initSet(s, color);
     for (int i = 0; i < 16; i++) {
         if (s->soldiers[i].type != t) {
             s->soldiers[i].State = DEAD;
             s->count--;
         }
     }
-    return s;
 }
 
 void mirrorBoard() {
@@ -203,9 +186,9 @@ void mirrorBoard() {
     Position *tpos;
 
     // mirror each soldier position
-    for (int j = 0; j < 2; j++) {
-        for (int i = 0; i < 16; i++) {
-            tpos = &ctx.board->sets[j]->soldiers[i].pos;
+    for (int s = 0; s < 2; s++) {
+        for (int j = 0; j < 16; j++) {
+            tpos = &ctx.board.sets[s].soldiers[j].pos;
             tpos->row = 7 - tpos->row;
             tpos->col = 7 - tpos->col;
         }
@@ -214,29 +197,29 @@ void mirrorBoard() {
     // mirror rectangles
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 8; j++) {
-            sq1 = &ctx.board->Squares[7 - i][j];
-            sq2 = &ctx.board->Squares[i][j];
+            sq1 = &ctx.board.Squares[7 - i][j];
+            sq2 = &ctx.board.Squares[i][j];
             temp = *sq1;
-            sq1->rectangle = sq2->rectangle;
-            sq2->rectangle = temp.rectangle;
+            sq1->pos = sq2->pos;
+            sq2->pos = temp.pos;
         }
     }
 
     for (int i = 0; i < 8; i++) {
         for (int j = 0; j < 4; j++) {
-            sq1 = &ctx.board->Squares[i][7 - j];
-            sq2 = &ctx.board->Squares[i][j];
+            sq1 = &ctx.board.Squares[i][7 - j];
+            sq2 = &ctx.board.Squares[i][j];
             temp = *sq1;
-            sq1->rectangle = sq2->rectangle;
-            sq2->rectangle = temp.rectangle;
+            sq1->pos = sq2->pos;
+            sq2->pos = temp.pos;
         }
     }
 
     // mirror rows
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 8; j++) {
-            sq1 = &ctx.board->Squares[7 - i][j];
-            sq2 = &ctx.board->Squares[i][j];
+            sq1 = &ctx.board.Squares[7 - i][j];
+            sq2 = &ctx.board.Squares[i][j];
             temp = *sq1;
             *sq1 = *sq2;
             *sq2 = temp;
@@ -246,8 +229,8 @@ void mirrorBoard() {
     // mirror columns
     for (int i = 0; i < 8; i++) {
         for (int j = 0; j < 4; j++) {
-            sq1 = &ctx.board->Squares[i][7 - j];
-            sq2 = &ctx.board->Squares[i][j];
+            sq1 = &ctx.board.Squares[i][7 - j];
+            sq2 = &ctx.board.Squares[i][j];
             temp = *sq1;
             *sq1 = *sq2;
             *sq2 = temp;
@@ -283,8 +266,8 @@ void drawInfoBar() {
     active = TextFormat("Active : %s", active_c);
     DrawText(active, margin * 2, margin * 2, fontSize, WHITE);
 
-    const char *bText = TextFormat("%s : %d", black, ctx.board->sets[0]->count);
-    const char *wText = TextFormat("%s : %d", white, ctx.board->sets[1]->count);
+    const char *bText = TextFormat("%s : %d", black, ctx.board.sets[0].count);
+    const char *wText = TextFormat("%s : %d", white, ctx.board.sets[1].count);
 
     Vector2 bTextSize = MeasureTextEx(GetFontDefault(), bText, fontSize, 0);
     Vector2 wTextSize = MeasureTextEx(GetFontDefault(), wText, fontSize, 0);
@@ -297,18 +280,22 @@ void drawInfoBar() {
 void drawBoard() {
     // draw ctx.board squares and soldiers
     drawInfoBar();
-    for (int i = 0; i < 8; i++) {
-        for (int j = 0; j < 8; j++) {
-            drawSq(&ctx.board->Squares[i][j]);
+    for (int y = 0; y < 8; y++) {
+        for (int x = 0; x < 8; x++) {
+            drawSq(&ctx.board.Squares[y][x]);
+            // drawSqEx(&ctx.board.Squares[y][x], (Vector2){
+            //                                        .x = x * SQUARE_WIDTH,
+            //                                        .y = y * SQUARE_WIDTH + INFOBAR_HEIGHT,
+            //                                    });
         }
     }
 }
 
 void drawSq(Square *sq) {
-    DrawRectangleRec(sq->rectangle, sq->color);
+    DrawRectangle(sq->pos.col, sq->pos.row, SQUARE_WIDTH, SQUARE_WIDTH, sq->color);
     if (sq->occupied) {
-        Vector2 sldrPos = {sq->rectangle.x + ((SQUARE_WIDTH - sq->sldr->shapText.width) / 2.f),
-                           sq->rectangle.y + ((SQUARE_WIDTH - sq->sldr->shapText.width) / 2.f)};
+        Vector2 sldrPos = {sq->pos.col + ((SQUARE_WIDTH - sq->sldr->shapText.width) / 2.f),
+                           sq->pos.row + ((SQUARE_WIDTH - sq->sldr->shapText.width) / 2.f)};
         DrawTexture(sq->sldr->shapText, sldrPos.x, sldrPos.y, WHITE);
     }
 }
@@ -316,7 +303,7 @@ void drawSq(Square *sq) {
 void colorBoardSquares() {
     for (int i = 0; i < 8; i++) {
         for (int j = 0; j < 8; j++) {
-            ctx.board->Squares[i][j].color = ctx.colors[(i + j) % 2];
+            ctx.board.Squares[i][j].color = ctx.colors[(i + j) % 2];
         }
     }
 }
@@ -326,8 +313,8 @@ bool inBoundaries(int pos) {
     return false;
 }
 
-void erroredEnd() {
-    destroydata();
+void errorExit() {
+    destroyData();
     printf("there is an error\n");
     exit(1);
 }
@@ -340,27 +327,22 @@ alist_t mergeList(alist_t *first, alist_t *second) {
     return *first;
 }
 
-Color *initColor() {
-    Color *colors = arena_alloc(&global_arena, 3 * sizeof(char *));
+void initColors(Color *colors) {
     colors[0] = DARKBROWN;
     colors[1] = BEIGE;
     colors[2] = GREEN;
-    return colors;
 }
 
-void initgdata() {
+void initGameData() {
     arena_init(&global_arena, 1024 * 2);
     SetTraceLogLevel(LOG_NONE);
     InitWindow(800, BOARD_HEIGHT + INFOBAR_HEIGHT, "Chess");
     SetTargetFPS(60);
-    Set_t *white = createSet(WHITE_TEAM);
-    Set_t *black = createSet(BLACK_TEAM);
-    blackTimer = &black->clk;
-    whiteTimer = &white->clk;
-    // Set_t *white = onlyType(ROOK, WHITE_TEAM);
-    // Set_t *black = onlyType(ROOK, BLACK_TEAM);
-    ctx.colors = initColor();
-    ctx.board = createBoard(white, black);
+    initColors(ctx.colors);
+    initBoard(&ctx.board);
+    // ctx.board = initBoard();
+    blackTimer = &ctx.board.sets[0].timer;
+    whiteTimer = &ctx.board.sets[1].timer;
     ctx.ACTIVE = WHITE_TEAM;
     ctx.movementChange = FROM;
     ctx.fromSquare = NULL;
@@ -368,10 +350,10 @@ void initgdata() {
 }
 
 // i need an arena
-void destroydata() {
+void destroyData() {
     for (int i = 0; i < 16; i++) {
-        UnloadTexture(ctx.board->sets[0]->soldiers[i].shapText);
-        UnloadTexture(ctx.board->sets[1]->soldiers[i].shapText);
+        UnloadTexture(ctx.board.sets[0].soldiers[i].shapText);
+        UnloadTexture(ctx.board.sets[1].soldiers[i].shapText);
     }
     CloseWindow();
     arena_destroy(&global_arena);
@@ -382,10 +364,8 @@ void destroydata() {
 int16_t alist_push_sq(alist_t *list, Square *sq) {
     if (!list || !sq) return EXIT_FAILURE;
     sq->color = GREEN;
-    Position pos = getArrPos((Vector2){sq->rectangle.x, sq->rectangle.y});
+    Position pos = getArrPos((Vector2){sq->pos.col, sq->pos.row});
     int16_t result = alist_push(list, &pos);
-    Position pos2 = *(Position *)alist_at(list, list->size - 1);
-    chooseSquare(pos2)->color = GREEN;
     return result;
 }
 

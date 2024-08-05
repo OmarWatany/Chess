@@ -1,12 +1,9 @@
 #ifndef _CHESS_HEِِِADER
 #define _CHESS_HEِِِADER
 
-#include "garraylist.h"
+#include "gds_types.h"
 #include "raylib.h"
 #include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 #ifdef __linux
 #define CLEAR system("clear")
@@ -27,7 +24,7 @@
 #define isEven(x) (!isOdd(x))
 
 typedef enum { DEAD, LIVE, CANT_MOVE } SOLDIER_STATE;
-typedef enum { WHITE_TEAM, BLACK_TEAM } TEAM_COLOR;
+typedef enum { WHITE_TEAM, BLACK_TEAM } TEAM;
 typedef enum { PAWN = 1, KNIGHT, BISHOP, ROOK, QUEEN, KING } SOLDIER_TYPE;
 typedef enum { FROM, TO } CHANGE;
 typedef enum { ZERO, ONE, MORE_THAN_ONE } NM_OF_MOVES;
@@ -59,46 +56,46 @@ struct OtherData {
 };
 
 struct Soldier {
-    Set_t *TEAM;
-    OtherData *otherdt;
     Texture2D shapText;
     Position pos;
+    Set_t *team;
+    OtherData *otherdt;
     SOLDIER_TYPE type;
     SOLDIER_STATE State;
 };
 
 struct Set_t {
-    Soldier *soldiers;
+    Soldier soldiers[16];
     unsigned int count;
-    TEAM_COLOR color;
-    Timer clk;
+    TEAM teamColor;
+    Timer timer;
 };
 
 struct Square {
+    Position pos;
     Soldier *sldr;
     Color color;
-    Rectangle rectangle;
     bool occupied;
 };
 
 struct Board {
-    Set_t *sets[2];
+    Set_t sets[2];
     Square Squares[8][8];
 };
 
 struct Context {
-    Board *board;
     alist_t availableSqs;
-    Color *colors;
-    TEAM_COLOR ACTIVE;
+    Color colors[3];
+    TEAM ACTIVE;
     CHANGE movementChange;
+    Board board;
     Square *fromSquare;
 };
 
 void game();
 void killEnemey(Soldier *sldr);
-Set_t *createSet(TEAM_COLOR color);
-Board *createBoard(Set_t *white, Set_t *black);
+void initSet(Set_t *s, TEAM color);
+void initBoard(Board *b);
 // next position functions
 alist_t calcNextMove(Square *sq);
 alist_t calcNextMovePawn(Square *fsq);
@@ -124,21 +121,20 @@ void displayNextSqsList();
 // av list functions
 alist_t mergeList(alist_t *, alist_t *);
 // closing functions
-void destroydata();
-void erroredEnd();
+void destroyData();
+void errorExit();
 void mirrorBoard();
 void colorBoardSquares();
 bool inBoundaries(int);
-Color *initColor();
 void drawWhileWhite();
 void drawWhileBlack();
-void initgdata();
+void initGameData();
 
 int16_t alist_push_sq(alist_t *list, Square *sq);
 Square *alist_sq_at(alist_t *list, size_t at);
 
 // for testing
-Set_t *onlyType(SOLDIER_TYPE t, TEAM_COLOR color);
+void onlyType(Set_t *s, SOLDIER_TYPE t, TEAM color);
 
 // global variables
 extern Context ctx;
