@@ -22,6 +22,13 @@ static inline bool isSecPassed(double previous, float seconds) {
     return (GetTime() - previous >= seconds);
 }
 
+static Vector2 getSldrPos(Position arrPos) {
+    Square *sq = chooseSquare(arrPos);
+    if (!sq->sldr) return (Vector2){-10, -10};
+    return (Vector2){arrPos.col * SQUARE_WIDTH + ((SQUARE_WIDTH - sq->sldr->shapText.width) / 2.f),
+                     arrPos.row * SQUARE_WIDTH + INFOBAR_HEIGHT + ((SQUARE_WIDTH - sq->sldr->shapText.width) / 2.f)};
+}
+
 void incTimer() {
     Timer *temp = NULL;
     if (ctx.ACTIVE == WHITE_TEAM)
@@ -38,6 +45,8 @@ void incTimer() {
 
 void game() {
     int valid = 0;
+    Vector2 fromPos = {0}, toPos = {0};
+    (void)fromPos, (void)toPos;
     while (!WindowShouldClose()) {
         valid = 0;
         ClearBackground(BLACK);
@@ -52,12 +61,27 @@ void game() {
             EndDrawing();
             break;
         } else if (IsKeyReleased(KEY_C)) {
-            cancelMovment();
+            resetMovement();
         }
+
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            Position pos = getArrPos(GetMousePosition());
-            valid = moveSldr(pos);
-            if (valid == 1) mirrorBoard();
+            Position fromArrPos, toArrPos;
+            switch (ctx.movementChange) {
+            case FROM:
+                fromArrPos = getArrPos(GetMousePosition());
+                fromPos = getSldrPos(fromArrPos);
+                valid = moveFrom(fromArrPos);
+                break;
+            case TO:
+                toArrPos = moveTo(getArrPos(GetMousePosition()), &valid);
+                if (valid == 1) {
+                    Square *nextSq = chooseSquare(toArrPos);
+                    nextSq->sldr->arrPos = toArrPos;
+                    toPos = getSldrPos(toArrPos);
+                    mirrorBoard();
+                }
+                break;
+            }
         }
         EndDrawing();
     }
@@ -73,8 +97,8 @@ void initBoard(Board *b) {
     // Initialize the square & set positions
     for (int y = 0; y < 8; y++) {
         for (int x = 0; x < 8; x++) {
-            b->Squares[y][x].pos.col = x * SQUARE_WIDTH;
-            b->Squares[y][x].pos.row = y * SQUARE_WIDTH + INFOBAR_HEIGHT;
+            // b->Squares[y][x].pos.col = x * SQUARE_WIDTH;
+            // b->Squares[y][x].pos.row = y * SQUARE_WIDTH + INFOBAR_HEIGHT;
             b->Squares[y][x].occupied = false;
             b->Squares[y][x].sldr = NULL;
             b->Squares[y][x].color = ctx.colors[isOdd(y + x)];
@@ -86,8 +110,8 @@ void initBoard(Board *b) {
             if (black->soldiers[(y * 8) + x].State == LIVE) {
                 b->Squares[y][x].occupied = true;
                 b->Squares[y][x].sldr = &(black->soldiers[(y * 8) + x]);
-                b->Squares[y][x].sldr->pos.col = x;
-                b->Squares[y][x].sldr->pos.row = y;
+                b->Squares[y][x].sldr->arrPos.col = x;
+                b->Squares[y][x].sldr->arrPos.row = y;
             }
         }
     }
@@ -97,8 +121,8 @@ void initBoard(Board *b) {
             if (white->soldiers[((y - 6) * 8) + x].State == LIVE) {
                 b->Squares[y][x].occupied = true;
                 b->Squares[y][x].sldr = &(white->soldiers[((y - 6) * 8) + x]);
-                b->Squares[y][x].sldr->pos.col = x;
-                b->Squares[y][x].sldr->pos.row = y;
+                b->Squares[y][x].sldr->arrPos.col = x;
+                b->Squares[y][x].sldr->arrPos.row = y;
             }
         }
     }
@@ -156,8 +180,12 @@ void initSet(Set_t *s, TEAM teamColor) {
         }
     }
     char *sldr_types[] = {
-        [PAWN] = "pawn", [KNIGHT] = "knight", [BISHOP] = "bishop", [ROOK] = "rook", [QUEEN] = "queen", [KING] = "king"};
-    char *team_color[] = {[WHITE_TEAM] = "white", [BLACK_TEAM] = "black"};
+        [PAWN] = "pawn", [KNIGHT] = "knight", [BISHOP] = "bishop", [ROOK] = "rook", [QUEEN] = "queen", [KING] = "king",
+    };
+    char *team_color[] = {
+        [WHITE_TEAM] = "white",
+        [BLACK_TEAM] = "black",
+    };
     float scale_factor = 0.85f;
     for (int i = 0; i < 16; i++) {
         Image soldierImage = {0};
@@ -188,7 +216,7 @@ void mirrorBoard() {
     // mirror each soldier position
     for (int s = 0; s < 2; s++) {
         for (int j = 0; j < 16; j++) {
-            tpos = &ctx.board.sets[s].soldiers[j].pos;
+            tpos = &ctx.board.sets[s].soldiers[j].arrPos;
             tpos->row = 7 - tpos->row;
             tpos->col = 7 - tpos->col;
         }
@@ -200,8 +228,8 @@ void mirrorBoard() {
             sq1 = &ctx.board.Squares[7 - i][j];
             sq2 = &ctx.board.Squares[i][j];
             temp = *sq1;
-            sq1->pos = sq2->pos;
-            sq2->pos = temp.pos;
+            // sq1->pos = sq2->pos;
+            // sq2->pos = temp.pos;
         }
     }
 
@@ -210,8 +238,8 @@ void mirrorBoard() {
             sq1 = &ctx.board.Squares[i][7 - j];
             sq2 = &ctx.board.Squares[i][j];
             temp = *sq1;
-            sq1->pos = sq2->pos;
-            sq2->pos = temp.pos;
+            // sq1->pos = sq2->pos;
+            // sq2->pos = temp.pos;
         }
     }
 
@@ -282,22 +310,18 @@ void drawBoard() {
     drawInfoBar();
     for (int y = 0; y < 8; y++) {
         for (int x = 0; x < 8; x++) {
-            drawSq(&ctx.board.Squares[y][x]);
-            // drawSqEx(&ctx.board.Squares[y][x], (Vector2){
-            //                                        .x = x * SQUARE_WIDTH,
-            //                                        .y = y * SQUARE_WIDTH + INFOBAR_HEIGHT,
-            //                                    });
+            drawSq((Position){.row = y, .col = x});
         }
     }
 }
 
-void drawSq(Square *sq) {
-    DrawRectangle(sq->pos.col, sq->pos.row, SQUARE_WIDTH, SQUARE_WIDTH, sq->color);
-    if (sq->occupied) {
-        Vector2 sldrPos = {sq->pos.col + ((SQUARE_WIDTH - sq->sldr->shapText.width) / 2.f),
-                           sq->pos.row + ((SQUARE_WIDTH - sq->sldr->shapText.width) / 2.f)};
-        DrawTexture(sq->sldr->shapText, sldrPos.x, sldrPos.y, WHITE);
-    }
+void drawSq(Position arrPos) {
+    Square *sq = &ctx.board.Squares[arrPos.row][arrPos.col];
+    DrawRectangle(arrPos.col * SQUARE_WIDTH, arrPos.row * SQUARE_WIDTH + INFOBAR_HEIGHT, SQUARE_WIDTH, SQUARE_WIDTH,
+                  sq->color);
+    if (!sq->occupied) return;
+    Vector2 sldrPos = getSldrPos(sq->sldr->arrPos);
+    DrawTexture(sq->sldr->shapText, sldrPos.x, sldrPos.y, WHITE);
 }
 
 void colorBoardSquares() {
@@ -361,10 +385,11 @@ void destroyData() {
     alist_destroy(&ctx.availableSqs);
 }
 
-int16_t alist_push_sq(alist_t *list, Square *sq) {
+int16_t alist_push_pos(alist_t *list, Position arrPos) {
+    Square *sq = chooseSquare(arrPos);
     if (!list || !sq) return EXIT_FAILURE;
     sq->color = GREEN;
-    Position pos = getArrPos((Vector2){sq->pos.col, sq->pos.row});
+    Position pos = arrPos;
     int16_t result = alist_push(list, &pos);
     return result;
 }

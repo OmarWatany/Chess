@@ -57,7 +57,8 @@ struct OtherData {
 
 struct Soldier {
     Texture2D shapText;
-    Position pos;
+    Position arrPos;
+    Vector2 pos;
     Set_t *team;
     OtherData *otherdt;
     SOLDIER_TYPE type;
@@ -72,7 +73,6 @@ struct Set_t {
 };
 
 struct Square {
-    Position pos;
     Soldier *sldr;
     Color color;
     bool occupied;
@@ -110,13 +110,14 @@ Square *chooseSquare(Position pos);
 Position choosePos(CHANGE change);
 Position getArrPos(Vector2 from);
 Soldier *selectSldr(Position SqPos);
-int moveSldr(Position pos);
+int moveFrom(Position pos);
+Position moveTo(Position pos, int *valid);
 bool isAvailable(Square *sq);
 void changeActive();
-void cancelMovment();
+void resetMovement();
 // displaying functions
 void drawBoard();
-void drawSq(Square *sq);
+void drawSq(Position arrPos);
 void displayNextSqsList();
 // av list functions
 alist_t mergeList(alist_t *, alist_t *);
@@ -130,7 +131,7 @@ void drawWhileWhite();
 void drawWhileBlack();
 void initGameData();
 
-int16_t alist_push_sq(alist_t *list, Square *sq);
+int16_t alist_push_pos(alist_t *list, Position arrPos);
 Square *alist_sq_at(alist_t *list, size_t at);
 
 // for testing

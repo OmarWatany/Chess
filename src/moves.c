@@ -1,5 +1,7 @@
 #include "chess.h"
 #include "garraylist.h"
+#include "raylib.h"
+#include <unistd.h>
 
 alist_t (*calc[])(Square *sq) = {
     [PAWN] = calcNextMovePawn, [KNIGHT] = calcNextMoveKnight, [BISHOP] = calcNextMoveBishop,
@@ -11,77 +13,71 @@ float cLerp(float start, float end, float amount) {
     return result;
 }
 
-int moveSldr(Position pos) {
-    Square **from = &ctx.fromSquare, *next;
-    switch (ctx.movementChange) {
-    case FROM:
-        (*from) = chooseSquare(pos);
-        // If chose empty square or non active team's soldier
-        if (!(*from)->occupied || (*from)->sldr->team->teamColor != ctx.ACTIVE) {
-            colorBoardSquares();
-            return 0;
+int moveFrom(Position pos) {
+    ctx.fromSquare = chooseSquare(pos);
+    // If chose empty square or non active team's soldier
+    if (!ctx.fromSquare->occupied || ctx.fromSquare->sldr->team->teamColor != ctx.ACTIVE) {
+        colorBoardSquares();
+        return 0;
+    }
+    ctx.availableSqs = calcNextMove(ctx.fromSquare);
+    if (alist_empty(&ctx.availableSqs)) {
+        colorBoardSquares();
+        return 0;
+    }
+    ctx.movementChange = TO;
+    return 2;
+}
+
+#define MOVE_VALID ((Position){-1, 0})
+#define MOVE_RESET ((Position){-1, -1})
+#define MOVE_ERROR ((Position){-1, -2})
+
+Position moveTo(Position pos, int *valid) {
+    Square *next;
+    next = chooseSquare(pos);
+    if (next->occupied && next->sldr->team->teamColor == ctx.ACTIVE) {
+        resetMovement();
+        moveFrom(pos);
+        return MOVE_RESET;
+    }
+    if (!isAvailable(next)) return MOVE_ERROR;
+
+    // If he is going to kill an enemy
+    if (next->sldr) {
+        killEnemey(next->sldr);
+    }
+
+    if (ctx.fromSquare->sldr->type == PAWN) {
+        // reset soldiers' state
+        for (int i = 0; i < 8; i++) {
+            ctx.board.sets[1].soldiers[i].otherdt->enpassant = false;
+            ctx.board.sets[0].soldiers[i + 8].otherdt->enpassant = false;
         }
-        ctx.availableSqs = calcNextMove(*from);
-        if (alist_empty(&ctx.availableSqs)) {
-            colorBoardSquares();
-            return 0;
+
+        // works with mirrored boards
+        if (pos.row == 4 && ctx.fromSquare->sldr->otherdt->NMOVES == ZERO) {
+            ctx.fromSquare->sldr->otherdt->enpassant = true;
         }
-        ctx.movementChange = TO;
-        return 2;
-    case TO:
-        next = chooseSquare(pos);
-        if (next->occupied && next->sldr->team->teamColor == ctx.ACTIVE) {
-            cancelMovment();
-            moveSldr(pos);
-            return 2;
-        }
-        if (isAvailable(next)) {
-            // If he is going to kill an enemy
-            if (next->occupied) {
-                killEnemey(next->sldr);
-            }
 
-            if ((*from)->sldr->type == PAWN) {
-                for (int i = 0; i < 8; i++) {
-                    if (ctx.board.sets[1].soldiers[i].otherdt->enpassant)
-                        ctx.board.sets[1].soldiers[i].otherdt->enpassant = false;
-                    if (ctx.board.sets[0].soldiers[i + 8].otherdt->enpassant)
-                        ctx.board.sets[0].soldiers[i + 8].otherdt->enpassant = false;
-                }
+        if (ctx.fromSquare->sldr->otherdt->NMOVES < MORE_THAN_ONE) (ctx.fromSquare->sldr->otherdt->NMOVES)++;
 
-                if (pos.row == 4 && (*from)->sldr->otherdt->NMOVES == ZERO) {
-                    (*from)->sldr->otherdt->enpassant = true;
-                }
-
-                if ((*from)->sldr->otherdt->NMOVES < MORE_THAN_ONE) ((*from)->sldr->otherdt->NMOVES)++;
-
-                if (pos.row == 2 && pos.col != (*from)->sldr->pos.col) {
-                    killEnemey(ctx.board.Squares[(int)(*from)->sldr->pos.row][(int)pos.col].sldr);
-                    ctx.board.Squares[(int)(*from)->sldr->pos.row][(int)pos.col].occupied = false;
-                }
-            }
-
-            (*from)->occupied = false;
-            next->sldr = (*from)->sldr;
-            next->occupied = true;
-            (*from)->sldr = NULL;
-
-            // while (next->sldr->pos.col != pos.col)
-            //     next->sldr->pos.col++;
-            // while (next->sldr->pos.row != pos.row) {
-            //     next->sldr->pos.row += 2;
-            //     DrawTexture(next->sldr->shapText, sldrPos.x, sldrPos.y, WHITE);
-            // }
-            // next->sldr->pos.col = cLerp(next->sldr->pos.col, pos.col, 0.1f);
-            // next->sldr->pos.row = cLerp(next->sldr->pos.row, pos.row, 0.1f);
-            next->sldr->pos = pos;
-            ctx.movementChange = FROM;
-            colorBoardSquares();
-            changeActive();
-            return 1;
+        if (pos.row == 2 && pos.col != ctx.fromSquare->sldr->arrPos.col) {
+            killEnemey(ctx.board.Squares[ctx.fromSquare->sldr->arrPos.row][pos.col].sldr);
+            ctx.board.Squares[ctx.fromSquare->sldr->arrPos.row][pos.col].occupied = false;
         }
     }
-    return 0;
+
+    next->occupied = true;
+    next->sldr = ctx.fromSquare->sldr;
+    ctx.fromSquare->sldr = NULL;
+    ctx.fromSquare->occupied = false;
+    // next->sldr->pos = pos;
+
+    resetMovement();
+    changeActive();
+    if (valid) *valid = 1;
+    return pos;
 }
 
 void killEnemey(Soldier *sldr) {
@@ -109,10 +105,10 @@ alist_t calcNextMove(Square *sq) {
 
 alist_t calcNextMovePawn(Square *fsq) {
     alist_t nextSqs = {0};
-    alist_init(&nextSqs, sizeof(Square *));
+    alist_init(&nextSqs, sizeof(Position *));
     alist_reserve(&nextSqs, 5);
     Square *nsq = NULL, *enmsq = NULL;
-    int colmn = fsq->sldr->pos.col, row = fsq->sldr->pos.row, praws = 0;
+    int colmn = fsq->sldr->arrPos.col, row = fsq->sldr->arrPos.row, praws = 0;
 
     // Number of possible squares
     praws = (fsq->sldr->otherdt->NMOVES == ZERO) + 1;
@@ -126,14 +122,14 @@ alist_t calcNextMovePawn(Square *fsq) {
     // check the next rows
     for (int i = 1; i <= praws && inBoundaries(row - 1) && !squares[row - 1][colmn]->occupied; i++) {
         nsq = squares[row - i][colmn];
-        if (!nsq->occupied) alist_push_sq(&nextSqs, nsq);
+        if (!nsq->occupied) alist_push_pos(&nextSqs, (Position){.row = row - i, .col = colmn});
     }
     // check the next colmns
     for (int c = -1; c <= 1; c++) {
         if (!inBoundaries(colmn + c)) continue;
         if (c != 0 && inBoundaries(row - 1)) {
             nsq = squares[row - 1][colmn + c];
-            if (isEnemy(fsq, nsq)) alist_push_sq(&nextSqs, nsq);
+            if (isEnemy(fsq, nsq)) alist_push_pos(&nextSqs, (Position){.row = row - 1, .col = colmn + c});
         }
     }
     // to calc en passant
@@ -142,13 +138,13 @@ alist_t calcNextMovePawn(Square *fsq) {
     // i can perform en passant & can't do it in next move
     //
     // check adjacent enemies
-    if (fsq->sldr->pos.row == 3) {
+    if (fsq->sldr->arrPos.row == 3) {
         for (int i = -1; i <= 1; i++) {
             if (i != 0 && inBoundaries(colmn + i)) {
                 enmsq = squares[row][colmn + i];
                 nsq = squares[row - 1][colmn + i];
                 if (isEnemy(fsq, enmsq) && enmsq->sldr->type == PAWN && enmsq->sldr->otherdt->enpassant) {
-                    alist_push_sq(&nextSqs, nsq);
+                    alist_push_pos(&nextSqs, (Position){.row = row - 1, .col = colmn + i});
                 }
             }
         }
@@ -157,10 +153,10 @@ alist_t calcNextMovePawn(Square *fsq) {
 }
 
 alist_t calcNextMoveKnight(Square *fsq) {
-    int colmn = fsq->sldr->pos.col, row = fsq->sldr->pos.row;
+    int colmn = fsq->sldr->arrPos.col, row = fsq->sldr->arrPos.row;
 
     alist_t nextSqs = {0};
-    alist_init(&nextSqs, sizeof(Square *));
+    alist_init(&nextSqs, sizeof(Position *));
     alist_reserve(&nextSqs, 8);
     int nrow, ncol;
 
@@ -179,7 +175,7 @@ alist_t calcNextMoveKnight(Square *fsq) {
             }
             if (!inBoundaries(nrow)) continue;
             n = &(ctx.board.Squares[nrow][ncol]);
-            if (!n->occupied || isEnemy(fsq, n)) alist_push_sq(&nextSqs, n);
+            if (!n->occupied || isEnemy(fsq, n)) alist_push_pos(&nextSqs, (Position){.row = nrow, .col = ncol});
         }
     }
 
@@ -187,113 +183,74 @@ alist_t calcNextMoveKnight(Square *fsq) {
 }
 
 alist_t calcNextMoveRook(Square *fsq) {
-    int colmn = fsq->sldr->pos.col, row = fsq->sldr->pos.row;
-
+    int colmn = fsq->sldr->arrPos.col, row = fsq->sldr->arrPos.row;
     // available squares before and after.
-    //
-
     alist_t nextSqs = {0};
-    alist_init(&nextSqs, sizeof(Position));
+    alist_init(&nextSqs, sizeof(Position *));
     Square *n = NULL;
 
     for (int c = colmn + 1; c <= 7; c++) {
         n = &(ctx.board.Squares[row][c]);
-        if (!n->occupied) {
-            alist_push_sq(&nextSqs, n);
-        } else if (isEnemy(fsq, n)) {
-            alist_push_sq(&nextSqs, n);
-            break;
-        } else
-            break;
+        if (!n->occupied || isEnemy(fsq, n)) alist_push_pos(&nextSqs, (Position){.row = row, .col = c});
+        if (n->occupied) break;
     }
 
     for (int c = colmn - 1; c >= 0; c--) {
         n = &(ctx.board.Squares[row][c]);
-        if (!n->occupied) {
-            alist_push_sq(&nextSqs, n);
-        } else if (isEnemy(fsq, n)) {
-            alist_push_sq(&nextSqs, n);
-            break;
-        } else
-            break;
+        if (!n->occupied || isEnemy(fsq, n)) alist_push_pos(&nextSqs, (Position){.row = row, .col = c});
+        if (n->occupied) break;
     }
 
     for (int r = row + 1; r <= 7; r++) {
         n = &(ctx.board.Squares[r][colmn]);
-        if (!n->occupied) {
-            alist_push_sq(&nextSqs, n);
-        } else if (isEnemy(fsq, n)) {
-            alist_push_sq(&nextSqs, n);
-            break;
-        } else
-            break;
+        if (!n->occupied || isEnemy(fsq, n)) alist_push_pos(&nextSqs, (Position){.row = r, .col = colmn});
+        if (n->occupied) break;
     }
 
     for (int r = row - 1; r >= 0; r--) {
         n = &(ctx.board.Squares[r][colmn]);
-        if (!n->occupied) {
-            alist_push_sq(&nextSqs, n);
-        } else if (isEnemy(fsq, n)) {
-            alist_push_sq(&nextSqs, n);
-            break;
-        } else
-            break;
+        if (!n->occupied || isEnemy(fsq, n)) alist_push_pos(&nextSqs, (Position){.row = r, .col = colmn});
+        if (n->occupied) break;
     }
 
     return nextSqs;
 }
 
 alist_t calcNextMoveBishop(Square *fsq) {
-    int colmn = fsq->sldr->pos.col, row = fsq->sldr->pos.row;
+    int colmn = fsq->sldr->arrPos.col, row = fsq->sldr->arrPos.row;
 
     alist_t nextSqs = {0};
-    alist_init(&nextSqs, sizeof(Square *));
+    alist_init(&nextSqs, sizeof(Position *));
     alist_reserve(&nextSqs, 15);
 
     Square *next = NULL;
 
     for (int i = 1; inBoundaries(colmn + i) && inBoundaries(row + i); i++) {
         next = &(ctx.board.Squares[row + i][colmn + i]);
-        if (!next->occupied) {
-            alist_push_sq(&nextSqs, next);
-        } else if (isEnemy(fsq, next)) {
-            alist_push_sq(&nextSqs, next);
-            break;
-        } else
-            break;
+        if (!next->occupied || isEnemy(fsq, next))
+            alist_push_pos(&nextSqs, (Position){.row = row + i, .col = colmn + i});
+        if (next->occupied) break;
     }
 
     for (int i = 1; inBoundaries(colmn - i) && inBoundaries(row - i); i++) {
         next = &(ctx.board.Squares[row - i][colmn - i]);
-        if (!next->occupied) {
-            alist_push_sq(&nextSqs, next);
-        } else if (isEnemy(fsq, next)) {
-            alist_push_sq(&nextSqs, next);
-            break;
-        } else
-            break;
+        if (!next->occupied || isEnemy(fsq, next))
+            alist_push_pos(&nextSqs, (Position){.row = row - i, .col = colmn - i});
+        if (next->occupied) break;
     }
 
     for (int i = 1; inBoundaries(colmn + i) && inBoundaries(row - i); i++) {
         next = &(ctx.board.Squares[row - i][colmn + i]);
-        if (!next->occupied) {
-            alist_push_sq(&nextSqs, next);
-        } else if (isEnemy(fsq, next)) {
-            alist_push_sq(&nextSqs, next);
-            break;
-        } else
-            break;
+        if (!next->occupied || isEnemy(fsq, next))
+            alist_push_pos(&nextSqs, (Position){.row = row - i, .col = colmn + i});
+        if (next->occupied) break;
     }
 
     for (int i = 1; inBoundaries(colmn - i) && inBoundaries(row + i); i++) {
         next = &(ctx.board.Squares[row + i][colmn - i]);
-        if (!next->occupied) {
-            alist_push_sq(&nextSqs, next);
-        } else if (isEnemy(fsq, next)) {
-            alist_push_sq(&nextSqs, next);
-            break;
-        } else
-            break;
+        if (!next->occupied || isEnemy(fsq, next))
+            alist_push_pos(&nextSqs, (Position){.row = row + i, .col = colmn - i});
+        if (next->occupied) break;
     }
 
     return nextSqs;
@@ -308,9 +265,9 @@ alist_t calcNextMoveQueen(Square *f) {
 }
 
 alist_t calcNextMoveKing(Square *fsq) {
-    int colmn = fsq->sldr->pos.col, row = fsq->sldr->pos.row;
+    int colmn = fsq->sldr->arrPos.col, row = fsq->sldr->arrPos.row;
     alist_t nextSqs = {0};
-    alist_init(&nextSqs, sizeof(Square *));
+    alist_init(&nextSqs, sizeof(Position *));
     alist_reserve(&nextSqs, 5);
 
     Square *n = NULL;
@@ -318,7 +275,8 @@ alist_t calcNextMoveKing(Square *fsq) {
         for (int r = -1; r <= 1; r++) {
             if (inBoundaries(row + r) && inBoundaries(colmn + c)) {
                 n = &(ctx.board.Squares[row + r][colmn + c]);
-                if (isEnemy(fsq, n) || !n->occupied) alist_push_sq(&nextSqs, n);
+                if (!n->occupied || isEnemy(fsq, n))
+                    alist_push_pos(&nextSqs, (Position){.row = row + r, .col = colmn + c});
             }
         }
     }
@@ -350,7 +308,7 @@ inline void changeActive() {
     ctx.ACTIVE = !ctx.ACTIVE;
 }
 
-void cancelMovment() {
+void resetMovement() {
     ctx.movementChange = FROM;
     colorBoardSquares();
 }

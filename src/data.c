@@ -38,15 +38,15 @@ void readSet(FILE *file, Set_t *s, Context *context) {
     int col = 0, row = 0;
     for (int i = 0; i < 16; i++) {
         readSldr(file, &s->soldiers[i]);
-        col = s->soldiers[i].pos.col;
-        row = s->soldiers[i].pos.row;
+        col = s->soldiers[i].arrPos.col;
+        row = s->soldiers[i].arrPos.row;
         context->board.Squares[row][col].sldr = &s->soldiers[i];
     }
 }
 
 void readSldr(FILE *file, Soldier *sldr) {
     SOLDIER_STATE *state = &sldr->State;
-    Position *pos = &sldr->pos;
+    Position *pos = &sldr->arrPos;
     fread(state, sizeof(SOLDIER_STATE), 1, file);
     fread(pos, sizeof(Position), 1, file);
     if (sldr->type == PAWN || sldr->type == KING) {
@@ -100,7 +100,7 @@ void writeSet(FILE *file, Set_t *s) {
 
 void writeSldr(FILE *file, Soldier *sldr) {
     SOLDIER_STATE *state = &sldr->State;
-    Position *pos = &sldr->pos;
+    Position *pos = &sldr->arrPos;
     fwrite(state, sizeof(SOLDIER_STATE), 1, file);
     fwrite(pos, sizeof(Position), 1, file);
     if (sldr->type == PAWN || sldr->type == KING) {
