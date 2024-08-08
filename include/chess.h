@@ -1,8 +1,7 @@
-#ifndef _CHESS_HEِِِADER
-#define _CHESS_HEِِِADER
+#ifndef _CHESS_HEADER
+#define _CHESS_HEADER
 
 #include "gds_types.h"
-#include "raylib.h"
 #include <stdbool.h>
 
 #ifdef __linux
@@ -30,40 +29,31 @@ typedef enum { FROM, TO } CHANGE;
 typedef enum { ZERO, ONE, MORE_THAN_ONE } NM_OF_MOVES;
 
 typedef struct Set_t Set_t;
-typedef struct Position Position;
-typedef struct OtherData OtherData;
-typedef struct Soldier Soldier;
-typedef struct Square Square;
-typedef struct Board Board;
-typedef struct Context Context;
-typedef struct Timer Timer;
 
-struct Position {
+typedef struct {
     int row;
     int col;
-};
+} Position;
 
-struct Timer {
+typedef struct {
     double m, s;
-};
+} Timer;
 
-struct OtherData {
+typedef struct {
     NM_OF_MOVES NMOVES;
     union {
         bool enpassant;
         bool check;
     };
-};
+} OtherData;
 
-struct Soldier {
-    Texture2D shapText;
+typedef struct {
     Position arrPos;
-    Vector2 pos;
-    Set_t *team;
+    Set_t *team_set;
     OtherData *otherdt;
     SOLDIER_TYPE type;
     SOLDIER_STATE State;
-};
+} Soldier;
 
 struct Set_t {
     Soldier soldiers[16];
@@ -72,25 +62,23 @@ struct Set_t {
     Timer timer;
 };
 
-struct Square {
+typedef struct {
     Soldier *sldr;
-    Color color;
     bool occupied;
-};
+} Square;
 
-struct Board {
+typedef struct {
     Set_t sets[2];
     Square Squares[8][8];
-};
+} Board;
 
-struct Context {
+typedef struct {
     alist_t availableSqs;
-    Color colors[3];
     TEAM ACTIVE;
     CHANGE movementChange;
     Board board;
     Square *fromSquare;
-};
+} Context;
 
 void game();
 void killEnemey(Soldier *sldr);
@@ -108,10 +96,9 @@ bool isEnemy(Square *from, Square *to);
 // move functions
 Square *chooseSquare(Position pos);
 Position choosePos(CHANGE change);
-Position getArrPos(Vector2 from);
 Soldier *selectSldr(Position SqPos);
 int moveFrom(Position pos);
-Position moveTo(Position pos, int *valid);
+int moveTo(Position to);
 bool isAvailable(Square *sq);
 void changeActive();
 void resetMovement();
@@ -139,5 +126,6 @@ void onlyType(Set_t *s, SOLDIER_TYPE t, TEAM color);
 
 // global variables
 extern Context ctx;
+// extern Arena global_arena;
 
-#endif // !_CHESS_HEِِِADER
+#endif // !_CHESS_HEADER

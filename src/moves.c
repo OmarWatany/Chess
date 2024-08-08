@@ -1,6 +1,5 @@
 #include "chess.h"
 #include "garraylist.h"
-#include "raylib.h"
 #include <unistd.h>
 
 alist_t (*calc[])(Square *sq) = {
@@ -8,15 +7,10 @@ alist_t (*calc[])(Square *sq) = {
     [ROOK] = calcNextMoveRook, [QUEEN] = calcNextMoveQueen,   [KING] = calcNextMoveKing,
 };
 
-float cLerp(float start, float end, float amount) {
-    float result = start + amount * (end - start);
-    return result;
-}
-
 int moveFrom(Position pos) {
     ctx.fromSquare = chooseSquare(pos);
     // If chose empty square or non active team's soldier
-    if (!ctx.fromSquare->occupied || ctx.fromSquare->sldr->team->teamColor != ctx.ACTIVE) {
+    if (!ctx.fromSquare->occupied || ctx.fromSquare->sldr->team_set->teamColor != ctx.ACTIVE) {
         colorBoardSquares();
         return 0;
     }
@@ -29,19 +23,15 @@ int moveFrom(Position pos) {
     return 2;
 }
 
-#define MOVE_VALID ((Position){-1, 0})
-#define MOVE_RESET ((Position){-1, -1})
-#define MOVE_ERROR ((Position){-1, -2})
-
-Position moveTo(Position pos, int *valid) {
+int moveTo(Position to) {
     Square *next;
-    next = chooseSquare(pos);
-    if (next->occupied && next->sldr->team->teamColor == ctx.ACTIVE) {
+    next = chooseSquare(to);
+    if (next->occupied && next->sldr->team_set->teamColor == ctx.ACTIVE) {
         resetMovement();
-        moveFrom(pos);
-        return MOVE_RESET;
+        moveFrom(to);
+        return 2;
     }
-    if (!isAvailable(next)) return MOVE_ERROR;
+    if (!isAvailable(next)) return 0;
 
     // If he is going to kill an enemy
     if (next->sldr) {
@@ -56,15 +46,15 @@ Position moveTo(Position pos, int *valid) {
         }
 
         // works with mirrored boards
-        if (pos.row == 4 && ctx.fromSquare->sldr->otherdt->NMOVES == ZERO) {
+        if (to.row == 4 && ctx.fromSquare->sldr->otherdt->NMOVES == ZERO) {
             ctx.fromSquare->sldr->otherdt->enpassant = true;
         }
 
         if (ctx.fromSquare->sldr->otherdt->NMOVES < MORE_THAN_ONE) (ctx.fromSquare->sldr->otherdt->NMOVES)++;
 
-        if (pos.row == 2 && pos.col != ctx.fromSquare->sldr->arrPos.col) {
-            killEnemey(ctx.board.Squares[ctx.fromSquare->sldr->arrPos.row][pos.col].sldr);
-            ctx.board.Squares[ctx.fromSquare->sldr->arrPos.row][pos.col].occupied = false;
+        if (to.row == 2 && to.col != ctx.fromSquare->sldr->arrPos.col) {
+            killEnemey(ctx.board.Squares[ctx.fromSquare->sldr->arrPos.row][to.col].sldr);
+            ctx.board.Squares[ctx.fromSquare->sldr->arrPos.row][to.col].occupied = false;
         }
     }
 
@@ -72,24 +62,15 @@ Position moveTo(Position pos, int *valid) {
     next->sldr = ctx.fromSquare->sldr;
     ctx.fromSquare->sldr = NULL;
     ctx.fromSquare->occupied = false;
-    // next->sldr->pos = pos;
 
     resetMovement();
     changeActive();
-    if (valid) *valid = 1;
-    return pos;
+    return 1;
 }
 
 void killEnemey(Soldier *sldr) {
     sldr->State = DEAD;
-    sldr->team->count--;
-}
-
-Position getArrPos(Vector2 from) {
-    return (Position){
-        (from.y - INFOBAR_HEIGHT) / BOARD_WIDTH * 8,
-        from.x / BOARD_WIDTH * 8,
-    };
+    sldr->team_set->count--;
 }
 
 Soldier *selectSldr(Position SqPos) {
@@ -284,7 +265,7 @@ alist_t calcNextMoveKing(Square *fsq) {
 }
 
 bool isEnemy(Square *from, Square *to) {
-    if (to->occupied && to->sldr->team->teamColor != from->sldr->team->teamColor) return true;
+    if (to->occupied && to->sldr->team_set->teamColor != from->sldr->team_set->teamColor) return true;
     return false;
 }
 
