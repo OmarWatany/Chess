@@ -1,6 +1,7 @@
 #ifndef _CHESS_HEADER
 #define _CHESS_HEADER
 
+#include "arena.h"
 #include "gds_types.h"
 #include <stdbool.h>
 
@@ -102,9 +103,11 @@ int moveTo(Position to);
 bool isAvailable(Square *sq);
 void changeActive();
 void resetMovement();
+void incTimer();
 // displaying functions
 void drawBoard();
 void drawSq(Position arrPos);
+void drawSqp(Square *sq);
 void displayNextSqsList();
 // av list functions
 alist_t mergeList(alist_t *, alist_t *);
@@ -126,6 +129,11 @@ void onlyType(Set_t *s, SOLDIER_TYPE t, TEAM color);
 
 // global variables
 extern Context ctx;
+extern Arena global_arena;
+extern Context ctx;
+extern Timer *blackTimer, *whiteTimer;
+extern double globalTime;
+extern uint8_t SquareColors[8][8];
 // extern Arena global_arena;
 
 #endif // !_CHESS_HEADER

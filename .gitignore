@@ -12,5 +12,9 @@ _deps
 CMakeUserPresets.json
 .data
 server
+chess_gui
+chess_tui
+chess_client
+chess_host
 chess
 .cache/
