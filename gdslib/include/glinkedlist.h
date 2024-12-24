@@ -8,38 +8,32 @@ extern "C" {
 #include "gds_types.h"
 #include <stdlib.h>
 
-llist_t    *list_create(size_t item_size);
-list_itr_t *list_itr_create(llist_t *list);
+// it's recommended to set item_size to 0 if you are going to save strings
+void    list_init(list_t *list, size_t item_size);
+list_t *list_create(size_t item_size);
 
-void list_init(llist_t *list, size_t item_size);
-void list_itr_init(list_itr_t *it, llist_t *list);
+int16_t push_front_safe(list_t *list, size_t item_size, gdata_t data);
+int16_t push_back_safe(list_t *list, size_t item_size, gdata_t data);
+int16_t push_front(list_t *list, gdata_t data);
+int16_t push_back(list_t *list, gdata_t data);
+gdata_t peak_front(list_t *list);
+gdata_t peak_back(list_t *list);
 
-size_t   list_item_size(llist_t *list);
-lnode_t *list_head(llist_t *list);
-lnode_t *list_tail(llist_t *list);
-lnode_t *next(list_itr_t *iterator);
-lnode_t *prev(list_itr_t *iterator);
-lnode_t *itr_begin(list_itr_t *iterator);
-lnode_t *itr_end(list_itr_t *iterator);
+// it copies data into buffer if exist
+int16_t pop_front(list_t *list, void *buffer);
+int16_t pop_back(list_t *list, void *buffer);
 
-int16_t push_front(llist_t *list, gdata_t data);
-int16_t push_back(llist_t *list, gdata_t data);
-int16_t pop_front(llist_t *list);
-int16_t pop_back(llist_t *list);
-gdata_t peak_front(llist_t *list);
-gdata_t peak_back(llist_t *list);
+// needs to be freed
+char *strpop_front(list_t *list);
+char *strpop_back(list_t *list);
 
-void list_destroy(llist_t *list);
-void llist_set_allocator(llist_t *list, gdata_t (*allocator_fun)(gdata_t data));
-void itr_set_from(list_itr_t *iterator, lnode_t *from);
-void itr_set_begin(list_itr_t *iterator, lnode_t *begin_node);
-void itr_set_end(list_itr_t *iterator, lnode_t *end_node);
+void list_set_allocator(list_t *list, gdata_t (*allocator_fun)(gdata_t data));
 
-llist_t *itr_list(list_itr_t *iterator);
-size_t   itr_t_size();
+void list_purge(list_t *list);
+void list_destroy(list_t *list);
 
-int16_t dump_list(llist_t *list, void (*print_data)(gdata_t));
-int16_t reverse_dump_list(llist_t *list, void (*print_data)(gdata_t));
+int16_t dump_list(list_t *list, void (*print_data)(gdata_t));
+int16_t reverse_dump_list(list_t *list, void (*print_data)(gdata_t));
 
 #ifdef __cplusplus
 }

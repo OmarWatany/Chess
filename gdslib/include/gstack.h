@@ -9,11 +9,14 @@ extern "C" {
 
 stack_t *stack_create(size_t item_size);
 
+int16_t stack_init(stack_t *stack, size_t item_size);
+int16_t stack_push_safe(stack_t *stack, size_t item_size, gdata_t data);
 int16_t stack_push(stack_t *stack, gdata_t data);
 void    stack_pop(stack_t *stack);
 void   *stack_peak(stack_t *stack);
 bool    stack_empty(stack_t *stack);
 
+void stack_purge(stack_t *stack);
 void stack_destroy(stack_t *stack);
 
 #ifdef __cplusplus
