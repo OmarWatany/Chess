@@ -7,14 +7,52 @@ alist_t (*calc[])(Square *sq) = {
     [ROOK] = calcNextMoveRook, [QUEEN] = calcNextMoveQueen,   [KING] = calcNextMoveKing,
 };
 
+int moveSldr(Position from, Position to) {
+    Square *fromSq = chooseSquare(from);
+    Square *nextSq = chooseSquare(to);
+
+    if (nextSq->sldr) {
+        killEnemey(nextSq->sldr);
+    }
+    if (fromSq->sldr->type == PAWN) {
+        // reset soldiers' state
+        for (int i = 0; i < 8; i++) {
+            ctx.board.sets[1].soldiers[i].otherdt->enpassant = false;
+            ctx.board.sets[0].soldiers[i + 8].otherdt->enpassant = false;
+        }
+
+        // works with mirrored boards
+        if (to.row == 4 && fromSq->sldr->otherdt->NMOVES == ZERO) {
+            fromSq->sldr->otherdt->enpassant = true;
+        }
+
+        if (fromSq->sldr->otherdt->NMOVES < MORE_THAN_ONE) (fromSq->sldr->otherdt->NMOVES)++;
+
+        if (to.row == 2 && to.col != fromSq->sldr->arrPos.col) {
+            killEnemey(ctx.board.Squares[fromSq->sldr->arrPos.row][to.col].sldr);
+            ctx.board.Squares[fromSq->sldr->arrPos.row][to.col].occupied = false;
+            ctx.board.Squares[fromSq->sldr->arrPos.row][to.col].sldr = NULL;
+        }
+    }
+
+    nextSq->occupied = true;
+    nextSq->sldr = fromSq->sldr;
+    fromSq->sldr = NULL;
+    fromSq->occupied = false;
+
+    changeActive();
+    return 0;
+}
+
 int moveFrom(Position pos) {
-    ctx.fromSquare = chooseSquare(pos);
+    ctx.fromPos = pos;
+    Square *fromSq = chooseSquare(pos);
     // If chose empty square or non active team's soldier
-    if (!ctx.fromSquare->occupied || ctx.fromSquare->sldr->team_set->teamColor != ctx.ACTIVE) {
+    if (!fromSq->occupied || fromSq->sldr->team_set->teamColor != ctx.ACTIVE) {
         colorBoardSquares();
         return 0;
     }
-    ctx.availableSqs = calcNextMove(ctx.fromSquare);
+    ctx.availableSqs = calcNextMove(fromSq);
     if (alist_empty(&ctx.availableSqs)) {
         colorBoardSquares();
         return 0;
@@ -24,8 +62,7 @@ int moveFrom(Position pos) {
 }
 
 int moveTo(Position to) {
-    Square *next;
-    next = chooseSquare(to);
+    Square *next = chooseSquare(to);
     if (next->occupied && next->sldr->team_set->teamColor == ctx.ACTIVE) {
         resetMovement();
         moveFrom(to);
@@ -33,38 +70,9 @@ int moveTo(Position to) {
     }
     if (!isAvailable(next)) return 0;
 
-    // If he is going to kill an enemy
-    if (next->sldr) {
-        killEnemey(next->sldr);
-    }
-
-    if (ctx.fromSquare->sldr->type == PAWN) {
-        // reset soldiers' state
-        for (int i = 0; i < 8; i++) {
-            ctx.board.sets[1].soldiers[i].otherdt->enpassant = false;
-            ctx.board.sets[0].soldiers[i + 8].otherdt->enpassant = false;
-        }
-
-        // works with mirrored boards
-        if (to.row == 4 && ctx.fromSquare->sldr->otherdt->NMOVES == ZERO) {
-            ctx.fromSquare->sldr->otherdt->enpassant = true;
-        }
-
-        if (ctx.fromSquare->sldr->otherdt->NMOVES < MORE_THAN_ONE) (ctx.fromSquare->sldr->otherdt->NMOVES)++;
-
-        if (to.row == 2 && to.col != ctx.fromSquare->sldr->arrPos.col) {
-            killEnemey(ctx.board.Squares[ctx.fromSquare->sldr->arrPos.row][to.col].sldr);
-            ctx.board.Squares[ctx.fromSquare->sldr->arrPos.row][to.col].occupied = false;
-        }
-    }
-
-    next->occupied = true;
-    next->sldr = ctx.fromSquare->sldr;
-    ctx.fromSquare->sldr = NULL;
-    ctx.fromSquare->occupied = false;
+    moveSldr(ctx.fromPos, to);
 
     resetMovement();
-    changeActive();
     return 1;
 }
 

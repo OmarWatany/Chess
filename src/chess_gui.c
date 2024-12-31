@@ -1,61 +1,193 @@
-#include "chess.h"
 #include "arena.h"
+#include "chess.h"
 #include "garraylist.h"
+#include "gringbuffer.h"
+#include "networking.h"
 #include "raylib.h"
+#include <stdio.h>
+#include <string.h>
+#include <time.h>
 
 void initTextures();
 void initColors(Color *colors);
+void onlineGame();
+int hostListen();
+void clientInit();
 static inline Position getArrPos(Vector2 from);
 static inline Vector2 getSldrPos(Position arrPos);
-static inline bool isSecPassed(double previous, float seconds);
 
 // GUI client's data
 Position sldrSize;
 Texture2D whiteShapeText[KING + 1] = {0};
 Texture2D blackShapeText[KING + 1] = {0};
 Color colors[3];
+TEAM PLAYER = WHITE_TEAM;
 
+SOCKET host = -1, client = -1;
+bool online = true;
+
+fd_set default_set;
+
+// NOTE: I can take main as common factor
 int main() {
     SetTraceLogLevel(LOG_NONE);
-    InitWindow(800, BOARD_HEIGHT + INFOBAR_HEIGHT, "Chess");
+    InitWindow(BOARD_WIDTH, BOARD_HEIGHT + INFOBAR_HEIGHT, "Chess");
     SetTargetFPS(60);
 
+    bool start = true;
     initColors(colors);
     initGameData();
     initTextures();
 
-    game();
+    switch (gui_menu()) {
+    case 0: // Start Game button
+        online = false;
+        game();
+        break;
+    case 1: // Host
+        if (hostListen()) goto FUNC_END;
+        break;
+    case 2: // Client
+        clientInit();
+        break;
+    default:
+        start = false;
+        break;
+    };
+    if (start && online) onlineGame();
 
+FUNC_END:
     destroyData();
     return 0;
 }
 
+int hostListen() {
+    host = serverSocket(0, PORT);
+    listen(host, 2);
+    char *waiting = "Waiting for connection...";
+    int fontSize = 40;
+    Vector2 loadingDim = MeasureTextEx(GetFontDefault(), waiting, fontSize, 0);
+    bool loading = true;
+    while (!ISVALIDSOCKET(client)) {
+        if (loading) {
+            ClearBackground(WHITE);
+            BeginDrawing();
+            DrawText(waiting, (BOARD_WIDTH - loadingDim.x) / 2.f, (BOARD_WIDTH - loadingDim.y) / 2.f, fontSize, BLACK);
+            EndDrawing();
+        }
+        if (IsKeyReleased(KEY_Q)) {
+            close(host);
+            return EXIT_FAILURE;
+        }
+        struct sockaddr_storage clientAddrress;
+        socklen_t clientLen = sizeof(clientAddrress);
+        client = accept(host, (struct sockaddr *)&clientAddrress, &clientLen);
+        if (!ISVALIDSOCKET(client)) continue;
+
+        nonblock(client);
+        loading = false;
+        char addressBuffer[100];
+        char portNumber[8];
+        getnameinfo((struct sockaddr *)&clientAddrress, clientLen, addressBuffer, sizeof(addressBuffer), portNumber,
+                    sizeof(portNumber), NI_NUMERICHOST);
+        printf("Client %s:%s connected\n", addressBuffer, portNumber);
+    }
+    FD_ZERO(&default_set);
+    FD_SET(client, &default_set);
+    return EXIT_SUCCESS;
+}
+
+void clientInit() {
+    PLAYER = BLACK_TEAM;
+    mirrorBoard();
+    host = connectHost(0, PORT);
+    FD_ZERO(&default_set);
+    FD_SET(host, &default_set);
+}
+
+void onlineGame() {
+    int valid;
+    globalTime = time(0);
+    Message moveMsg = {0};
+
+    while (!WindowShouldClose()) {
+        ClearBackground(BLACK);
+        BeginDrawing();
+        drawBoard();
+        EndDrawing();
+        valid = 0;
+
+        if (isSecPassed(globalTime, 1)) incTimer();
+        if (IsKeyReleased(KEY_C)) resetMovement();
+        if (IsKeyReleased(KEY_Q) || host < 0) goto FUNC_END;
+
+        moveMsg = getMessage(PLAYER == WHITE_TEAM ? client : host);
+        if (msgVerify(&moveMsg)) moveMsg.kind = MSG_BOGUS;
+        if (moveMsg.kind == PEER_CLOSED) goto FUNC_END;
+
+        if (ctx.ACTIVE != PLAYER) {
+            switch (moveMsg.kind) {
+            case MSG_BOGUS:
+                printf("MSG_BOGUS\n");
+                // TODO: resend Message
+                break;
+            case MSG_MOVE:
+                // temporary solution
+                mirrorBoard();
+                valid = moveFrom(moveMsg.from);
+                valid = moveTo(moveMsg.to);
+                if (valid == 1) {
+                    Square *nextSq = chooseSquare(moveMsg.to);
+                    Soldier *sldr = nextSq->sldr;
+                    sldr->arrPos = moveMsg.to;
+                }
+                mirrorBoard();
+            default:
+                break;
+            }
+        }
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && ctx.ACTIVE == PLAYER) {
+            Position tArrPos = getArrPos(GetMousePosition());
+            if (ctx.movementChange == FROM) {
+                valid = moveFrom(tArrPos);
+            } else if (ctx.movementChange == TO && (valid = moveTo(tArrPos)) == 1) {
+                moveMsg.to = tArrPos;
+                Square *nextSq = chooseSquare(tArrPos);
+                Soldier *sldr = nextSq->sldr;
+                sldr->arrPos = tArrPos;
+                msgSetup(&moveMsg);
+                sendMessage(PLAYER == WHITE_TEAM ? client : host, &moveMsg);
+            }
+            if ((ctx.movementChange == TO && valid == 2) || ctx.movementChange == FROM) moveMsg.from = tArrPos;
+        }
+    }
+FUNC_END:
+    if (host >= 0) close(host);
+    if (client >= 0) close(client);
+}
+
 void game() {
+    globalTime = time(0);
+
     int valid;
     while (!WindowShouldClose()) {
         valid = 0;
-        if (isSecPassed(globalTime, 1)) {
-            globalTime = GetTime();
-            incTimer();
-        }
+        if (isSecPassed(globalTime, 1)) incTimer();
 
         if (IsKeyReleased(KEY_C)) {
             resetMovement();
         } else if (IsKeyReleased(KEY_Q)) {
             break;
         }
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
             Position tArrPos = getArrPos(GetMousePosition());
             if (ctx.movementChange == FROM) {
                 valid = moveFrom(tArrPos);
-            } else {
-                valid = moveTo(tArrPos);
-                if (valid == 1) {
-                    Square *nextSq = chooseSquare(tArrPos);
-                    Soldier *sldr = nextSq->sldr;
-                    sldr->arrPos = tArrPos;
-                    mirrorBoard();
-                }
+            } else if (ctx.movementChange == TO && (valid = moveTo(tArrPos))) {
+                Square *nextSq = chooseSquare(tArrPos);
+                Soldier *sldr = nextSq->sldr;
+                sldr->arrPos = tArrPos;
+                mirrorBoard();
             }
         }
 
@@ -64,10 +196,6 @@ void game() {
         drawBoard();
         EndDrawing();
     }
-}
-
-bool isSecPassed(double previous, float seconds) {
-    return (GetTime() - previous >= seconds);
 }
 
 Vector2 getSldrPos(Position arrPos) {
@@ -164,7 +292,7 @@ void drawBoard() {
 }
 
 void drawSq(Position arrPos) {
-    Square *sq = &ctx.board.Squares[arrPos.row][arrPos.col];
+    Square *sq = &(ctx.board.Squares[arrPos.row][arrPos.col]);
     Vector2 rectPos = (Vector2){
         .x = arrPos.col * SQUARE_WIDTH,
         .y = arrPos.row * SQUARE_WIDTH + INFOBAR_HEIGHT,
@@ -181,6 +309,7 @@ void drawSq(Position arrPos) {
 }
 
 void destroyData() {
+    ring_destroy(&rbuffer);
     for (int i = PAWN; i < KING + 1; i++) {
         UnloadTexture(whiteShapeText[i]);
         UnloadTexture(blackShapeText[i]);

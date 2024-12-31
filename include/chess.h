@@ -7,9 +7,7 @@
 
 #ifdef __linux
 #define CLEAR system("clear")
-#endif
-
-#ifdef __WIN32__
+#elif defined(__WIN32__)
 #define CLEAR system("cls")
 #endif
 
@@ -28,6 +26,7 @@ typedef enum { WHITE_TEAM, BLACK_TEAM } TEAM;
 typedef enum { PAWN = 1, KNIGHT, BISHOP, ROOK, QUEEN, KING } SOLDIER_TYPE;
 typedef enum { FROM, TO } CHANGE;
 typedef enum { ZERO, ONE, MORE_THAN_ONE } NM_OF_MOVES;
+typedef enum { MSG_BOGUS = 1, MSG_MOVE, PEER_CLOSED } MESSAGE_KIND;
 
 typedef struct Set_t Set_t;
 
@@ -78,8 +77,15 @@ typedef struct {
     TEAM ACTIVE;
     CHANGE movementChange;
     Board board;
-    Square *fromSquare;
+    Position fromPos;
 } Context;
+
+typedef struct {
+    char start[2];
+    MESSAGE_KIND kind;
+    Position from, to;
+    char end[2];
+} Message;
 
 void game();
 void killEnemey(Soldier *sldr);
@@ -98,9 +104,11 @@ bool isEnemy(Square *from, Square *to);
 Square *chooseSquare(Position pos);
 Position choosePos(CHANGE change);
 Soldier *selectSldr(Position SqPos);
+int moveSldr(Position from, Position to);
 int moveFrom(Position pos);
 int moveTo(Position to);
 bool isAvailable(Square *sq);
+bool isSecPassed(time_t previous, time_t seconds);
 void changeActive();
 void resetMovement();
 void incTimer();
@@ -115,6 +123,9 @@ alist_t mergeList(alist_t *, alist_t *);
 void destroyData();
 void errorExit();
 void mirrorBoard();
+void mirrorMassage(Message *msg);
+void msgSetup(Message *msg);
+int msgVerify(Message *msg);
 void colorBoardSquares();
 bool inBoundaries(int);
 void drawWhileWhite();
@@ -124,16 +135,18 @@ void initGameData();
 int16_t alist_push_pos(alist_t *list, Position arrPos);
 Square *alist_sq_at(alist_t *list, size_t at);
 
+int gui_menu();
+
 // for testing
 void onlyType(Set_t *s, SOLDIER_TYPE t, TEAM color);
 
 // global variables
+extern ringbuffer rbuffer;
 extern Context ctx;
 extern Arena global_arena;
-extern Context ctx;
 extern Timer *blackTimer, *whiteTimer;
-extern double globalTime;
+extern time_t globalTime;
 extern uint8_t SquareColors[8][8];
-// extern Arena global_arena;
+extern bool online;
 
 #endif // !_CHESS_HEADER

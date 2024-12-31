@@ -3,22 +3,26 @@
 #include "chess.h"
 #include "data.h"
 #include "garraylist.h"
+#include "gringbuffer.h"
 #include <stdio.h>
+#include <time.h>
 
 Arena global_arena;
 Context ctx;
 Timer *blackTimer, *whiteTimer;
-double globalTime = 0;
+time_t globalTime = 0;
 uint8_t SquareColors[8][8] = {0};
+ringbuffer rbuffer;
 
 void initGameData() {
+    ring_init(&rbuffer, 4 * 1024);
     arena_init(&global_arena, 1024 * 2);
     initBoard(&ctx.board);
     blackTimer = &ctx.board.sets[0].timer;
     whiteTimer = &ctx.board.sets[1].timer;
     ctx.ACTIVE = WHITE_TEAM;
     ctx.movementChange = FROM;
-    ctx.fromSquare = NULL;
+    ctx.fromPos = (Position){0};
     colorBoardSquares();
 }
 
@@ -117,6 +121,13 @@ void onlyType(Set_t *s, SOLDIER_TYPE t, TEAM color) {
     }
 }
 
+bool isSecPassed(time_t previous, time_t seconds) {
+    int deff = time(0) - previous;
+    bool r = deff >= seconds;
+    if (r) globalTime = time(0);
+    return r;
+}
+
 void incTimer() {
     Timer *temp = NULL;
     if (ctx.ACTIVE == WHITE_TEAM)
@@ -167,6 +178,27 @@ void mirrorBoard() {
             };
         }
     }
+}
+
+void mirrorMassage(Message *msg) {
+    msg->from = (Position){
+        .row = 7 - msg->from.row,
+        .col = 7 - msg->from.col,
+    };
+    msg->to = (Position){
+        .row = 7 - msg->to.row,
+        .col = 7 - msg->to.col,
+    };
+}
+
+void msgSetup(Message *msg) {
+    msg->kind = MSG_MOVE;
+    memcpy(&msg->start, "\r", 2);
+    memcpy(&msg->end, "\r", 2);
+}
+
+int msgVerify(Message *msg) {
+    return strcmp(msg->start, msg->end);
 }
 
 void colorBoardSquares() {

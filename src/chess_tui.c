@@ -9,7 +9,7 @@ void initColors(char *colors[3]);
 void initShapes();
 void debug();
 
-Context *gdata = &ctx;
+Context *localCtx = &ctx;
 
 char *colors[3];
 char *shapes[KING + 1];
@@ -20,31 +20,48 @@ void erroredEnd() {
     exit(1);
 }
 
-int printMenu() {
+int printMenu(char *menu[], size_t menuSz) {
     char data[64];
     CLEAR;
-    printf("1. Start New Game\n");
-    printf("2. Resume\n");
-    printf("3. Quit\n");
+    for (size_t i = 0; i < menuSz; i++)
+        printf("%ld. %s\n", i + 1, menu[i]);
     printf("Enter option : ");
     if (!scanf(" %s", data)) erroredEnd();
     return data[0];
 }
+void saveMenu(Context *ctx) {
+    char *menuOptions[] = {
+        "Save",
+        "Don't Save",
+    };
+    switch (printMenu(menuOptions, sizeof(menuOptions) / sizeof(char *))) {
+    case '1':
+        save(ctx);
+    default:
+        break;
+    }
+}
 
 void menu() {
-    int in = printMenu();
-
-    switch (in) {
+    char *menuOptions[] = {"Start New Game", "Resume", "Online Server", "Online Client", "Quit"};
+    switch (printMenu(menuOptions, sizeof(menuOptions) / sizeof(char *))) {
     case '1':
         game();
-        save(gdata);
+        saveMenu(localCtx);
         break;
     case '2':
-        load(gdata);
+        load(localCtx);
         game();
-        save(gdata);
+        saveMenu(localCtx);
         break;
     case '3':
+        printf("NOT SUPPORTED YET\n");
+        break;
+    case '4':
+        printf("NOT SUPPORTED YET\n");
+        break;
+    case '5':
+        printf("NOT SUPPORTED YET\n");
         break;
     case 'd':
         debug();
@@ -104,7 +121,7 @@ Position choosePos(CHANGE change) {
         choosePos(change);
     }
 
-    switch (gdata->ACTIVE) {
+    switch (localCtx->ACTIVE) {
     case WHITE_TEAM:
         pos.row = 8 - raw;
         pos.col = col - 65;
@@ -118,6 +135,7 @@ Position choosePos(CHANGE change) {
     }
     return pos;
 }
+
 void printCommands() {
     printf("1. choose soldier");
     printf("\t2. quit\n");
@@ -175,7 +193,7 @@ void initShapes() {
 void drawBoard() {
     // draw gdata->board squares and soldiers
     CLEAR;
-    switch (gdata->ACTIVE) {
+    switch (localCtx->ACTIVE) {
     case BLACK_TEAM:
         drawWhileBlack();
         break;

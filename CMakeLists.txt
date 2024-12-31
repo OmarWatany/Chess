@@ -25,21 +25,22 @@ add_executable(chess_gui
     src/data.c
     src/moves.c
     src/networking.c
-    src/game.c
+    src/common.c
+    src/menu.c
     include/chess.h
     include/arena.h
     include/data.h
 )
 
-target_compile_options(chess_gui PRIVATE -Wall -Wextra -g)
+target_compile_options(chess_gui PRIVATE -Wall -g)
 target_link_libraries(chess_gui gdslib raylib m)
 
 add_executable(chess_tui
     src/chess_tui.c
     src/data.c
     src/moves.c
-    src/networking.c
-    src/game.c
+    # src/networking.c
+    src/common.c
     include/chess.h
     include/arena.h
     include/data.h
