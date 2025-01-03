@@ -20,7 +20,7 @@ void erroredEnd() {
     exit(1);
 }
 
-int printMenu(char *menu[], size_t menuSz) {
+int menu(char *menu[], size_t menuSz) {
     char data[64];
     CLEAR;
     for (size_t i = 0; i < menuSz; i++)
@@ -29,12 +29,13 @@ int printMenu(char *menu[], size_t menuSz) {
     if (!scanf(" %s", data)) erroredEnd();
     return data[0];
 }
+
 void saveMenu(Context *ctx) {
     char *menuOptions[] = {
         "Save",
         "Don't Save",
     };
-    switch (printMenu(menuOptions, sizeof(menuOptions) / sizeof(char *))) {
+    switch (menu(menuOptions, sizeof(menuOptions) / sizeof(char *))) {
     case '1':
         save(ctx);
     default:
@@ -42,9 +43,9 @@ void saveMenu(Context *ctx) {
     }
 }
 
-void menu() {
+void mainMenu() {
     char *menuOptions[] = {"Start New Game", "Resume", "Online Server", "Online Client", "Quit"};
-    switch (printMenu(menuOptions, sizeof(menuOptions) / sizeof(char *))) {
+    switch (menu(menuOptions, sizeof(menuOptions) / sizeof(char *))) {
     case '1':
         game();
         saveMenu(localCtx);
@@ -55,12 +56,7 @@ void menu() {
         saveMenu(localCtx);
         break;
     case '3':
-        printf("NOT SUPPORTED YET\n");
-        break;
     case '4':
-        printf("NOT SUPPORTED YET\n");
-        break;
-    case '5':
         printf("NOT SUPPORTED YET\n");
         break;
     case 'd':
@@ -77,7 +73,7 @@ int main() {
     initShapes();
     // initgdata();
 
-    menu();
+    mainMenu();
 
     destroyData();
     return 0;

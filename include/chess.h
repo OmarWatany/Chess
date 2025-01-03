@@ -20,6 +20,7 @@
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 #define isOdd(x) ((x) % 2)
 #define isEven(x) (!isOdd(x))
+#define ARRAY_LEN(x) (sizeof((x)) / sizeof((x)[0]))
 
 typedef enum { DEAD, LIVE, CANT_MOVE } SOLDIER_STATE;
 typedef enum { WHITE_TEAM, BLACK_TEAM } TEAM;
@@ -135,7 +136,7 @@ void initGameData();
 int16_t alist_push_pos(alist_t *list, Position arrPos);
 Square *alist_sq_at(alist_t *list, size_t at);
 
-int gui_menu();
+int menu(char *Options[], size_t sz);
 
 // for testing
 void onlyType(Set_t *s, SOLDIER_TYPE t, TEAM color);

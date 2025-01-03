@@ -26,7 +26,7 @@ add_executable(chess_gui
     src/moves.c
     src/networking.c
     src/common.c
-    src/menu.c
+    src/gui.c
     include/chess.h
     include/arena.h
     include/data.h

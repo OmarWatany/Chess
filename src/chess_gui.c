@@ -28,26 +28,21 @@ bool online = true;
 
 fd_set default_set;
 
-// NOTE: I can take main as common factor
-int main() {
-    SetTraceLogLevel(LOG_NONE);
-    InitWindow(BOARD_WIDTH, BOARD_HEIGHT + INFOBAR_HEIGHT, "Chess");
-    SetTargetFPS(60);
-
+void mainMenu() {
     bool start = true;
-    initColors(colors);
-    initGameData();
-    initTextures();
+    char *menuOptions[] = {
+        "START GAME", "RESUME", "HOST", "CLIENT", "QUIT GAME",
+    };
 
-    switch (gui_menu()) {
+    switch (menu(menuOptions, ARRAY_LEN(menuOptions))) {
     case 0: // Start Game button
         online = false;
         game();
         break;
-    case 1: // Host
-        if (hostListen()) goto FUNC_END;
+    case 2: // Host
+        if (hostListen()) return;
         break;
-    case 2: // Client
+    case 3: // Client
         clientInit();
         break;
     default:
@@ -55,8 +50,19 @@ int main() {
         break;
     };
     if (start && online) onlineGame();
+}
 
-FUNC_END:
+// NOTE: I can take main as common factor
+int main() {
+    SetTraceLogLevel(LOG_NONE);
+    InitWindow(BOARD_WIDTH, BOARD_HEIGHT + INFOBAR_HEIGHT, "Chess");
+    SetTargetFPS(60);
+
+    initColors(colors);
+    initGameData();
+    initTextures();
+
+    mainMenu();
     destroyData();
     return 0;
 }
