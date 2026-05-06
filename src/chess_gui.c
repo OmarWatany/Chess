@@ -5,7 +5,6 @@
 #include "networking.h"
 #include "raylib.h"
 #include <stdio.h>
-#include <string.h>
 #include <time.h>
 
 void initTextures();
@@ -68,7 +67,7 @@ int main() {
 }
 
 int hostListen() {
-    host = serverSocket(0, PORT);
+    host = serverSocket("localhost", PORT);
     listen(host, 2);
     char *waiting = "Waiting for connection...";
     int fontSize = 40;
@@ -190,9 +189,6 @@ void game() {
             if (ctx.movementChange == FROM) {
                 valid = moveFrom(tArrPos);
             } else if (ctx.movementChange == TO && (valid = moveTo(tArrPos))) {
-                Square *nextSq = chooseSquare(tArrPos);
-                Soldier *sldr = nextSq->sldr;
-                sldr->arrPos = tArrPos;
                 mirrorBoard();
             }
         }

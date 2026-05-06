@@ -3,7 +3,6 @@
 #include "garraylist.h"
 #include <stdio.h>
 #include <stdlib.h>
-// #include <string.h>
 
 void initColors(char *colors[3]);
 void initShapes();
@@ -159,9 +158,6 @@ void game() {
                 } else {
                     valid = moveTo(tArrPos);
                     if (valid == 1) {
-                        Square *nextSq = chooseSquare(tArrPos);
-                        Soldier *sldr = nextSq->sldr;
-                        sldr->arrPos = tArrPos;
                         mirrorBoard();
                     }
                 }
@@ -238,7 +234,7 @@ void drawWhileBlack() {
 void drawSq(Position pos) {
     Square *sq = chooseSquare(pos);
     char *sqColor = colors[SquareColors[pos.row][pos.col]];
-    if (sq->occupied) {
+    if (sq->sldr) { // if occupied
         if (sq->sldr->team_set->teamColor == BLACK_TEAM) {
             printf(" \033[;31m%s\033[;0m ", shapes[sq->sldr->type]);
         } else {

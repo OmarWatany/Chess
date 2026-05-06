@@ -55,8 +55,9 @@ void readSldr(FILE *file, Soldier *sldr) {
 }
 
 void readSq(FILE *file, Square *sq) {
-    fread(&sq->occupied, sizeof(bool), 1, file);
-    if (!sq->occupied) {
+    bool occ = 0;
+    fread(&occ, sizeof(bool), 1, file);
+    if (!occ) {
         // printf("occupation: %d\n", sq->occupied);
         sq->sldr = NULL;
     }
@@ -109,6 +110,6 @@ void writeSldr(FILE *file, Soldier *sldr) {
 }
 
 void writeSq(FILE *file, Square *sq) {
-    bool *occ = &sq->occupied;
-    fwrite(occ, sizeof(bool), 1, file);
+    bool occ = (sq->sldr != NULL);
+    fwrite(&occ, sizeof(bool), 1, file);
 }

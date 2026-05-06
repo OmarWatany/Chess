@@ -34,18 +34,13 @@ void initBoard(Board *b) {
     // onlyType(black, ROOK, BLACK_TEAM);
 
     // Initialize the square & set positions
-    for (int y = 0; y < 8; y++) {
-        for (int x = 0; x < 8; x++) {
-            b->Squares[y][x].occupied = false;
-            b->Squares[y][x].sldr = NULL;
-        }
+    memset(b->Squares, 0, sizeof(b->Squares));
     }
 
     // Black Set
     for (int y = 0; y < 2; y++) {
         for (int x = 0; x < 8; x++) {
             if (black->soldiers[(y * 8) + x].State == DEAD) continue;
-            b->Squares[y][x].occupied = true;
             b->Squares[y][x].sldr = &(black->soldiers[(y * 8) + x]);
             b->Squares[y][x].sldr->arrPos = (Position){.row = y, .col = x};
         }
@@ -55,7 +50,6 @@ void initBoard(Board *b) {
     for (int y = 6; y < 8; y++) {
         for (int x = 0; x < 8; x++) {
             if (white->soldiers[((y - 6) * 8) + x].State == DEAD) continue;
-            b->Squares[y][x].occupied = true;
             b->Squares[y][x].sldr = &(white->soldiers[((y - 6) * 8) + x]);
             b->Squares[y][x].sldr->arrPos = (Position){.row = y, .col = x};
         }

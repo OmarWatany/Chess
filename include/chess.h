@@ -65,7 +65,6 @@ struct Set_t {
 
 typedef struct {
     Soldier *sldr;
-    bool occupied;
 } Square;
 
 typedef struct {
