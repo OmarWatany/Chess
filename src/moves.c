@@ -4,6 +4,9 @@
 #include <unistd.h>
 
 #define occupied(sq) (sq->sldr != NULL)
+
+void markPossibles(TEAM team);
+
 alist_t (*calc[])(Square *sq) = {
     [PAWN] = calcNextMovePawn, [KNIGHT] = calcNextMoveKnight, [BISHOP] = calcNextMoveBishop,
     [ROOK] = calcNextMoveRook, [QUEEN] = calcNextMoveQueen,   [KING] = calcNextMoveKing,
@@ -71,7 +74,16 @@ int moveTo(Position to) {
     }
     if (!isAvailable(next)) return 0;
 
+    Soldier *fromSldr = chooseSquare(ctx.fromPos)->sldr;
+    if (fromSldr->type != KING)
+        for (size_t i = 0; i < alist_size(&ctx.availableSqs); i++)
+        alist_sq_at(&ctx.availableSqs, i)->possible[fromSldr->team_set->teamColor]--;
+
     moveSldr(ctx.fromPos, to);
+
+    ctx.availableSqs = calcNextMove(next);
+    if (fromSldr->type != KING)
+        markPossibles(fromSldr->team_set->teamColor);
 
     resetMovement();
     return 1;
@@ -266,6 +278,7 @@ alist_t calcNextMoveKing(Square *fsq) {
             if(!inBoundaries(row + r) || !inBoundaries(colmn + c))
                 continue;
             n = &(ctx.board.Squares[row + r][colmn + c]);
+            if (n->possible[fsq->sldr->team_set->teamColor == BLACK_TEAM ? WHITE_TEAM : BLACK_TEAM] > 0) continue;
             if (!occupied(n) || isEnemy(fsq, n))
                 alist_push_pos(&nextSqs, (Position){.row = row + r, .col = colmn + c});
         }
@@ -283,6 +296,12 @@ Square *chooseSquare(Position pos) {
         return &(ctx.board.Squares[(int)pos.row][(int)pos.col]);
     } else
         return 0;
+}
+
+void markPossibles(TEAM team) {
+    if (alist_at(&ctx.availableSqs, 0) == NULL) return;
+    for (size_t i = 0; i < alist_size(&ctx.availableSqs); i++)
+        alist_sq_at(&ctx.availableSqs, i)->possible[team]++;
 }
 
 bool isAvailable(Square *sq) {

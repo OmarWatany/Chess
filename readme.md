@@ -4,13 +4,13 @@
 
 ## TODO
 - [ ] menu
-- [ ] illegal moves 
-- [ ] castling 
+- [X] illegal moves
+- [ ] castling
 - [ ] checkmate
 - [ ] multiple resolutions
 
-## build 
-```console 
+## build
+```console
 cmake .
 make
 ```

@@ -65,6 +65,7 @@ struct Set_t {
 
 typedef struct {
     Soldier *sldr;
+    char possible[2];
 } Square;
 
 typedef struct {

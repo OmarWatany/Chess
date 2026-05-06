@@ -35,6 +35,17 @@ void initBoard(Board *b) {
 
     // Initialize the square & set positions
     memset(b->Squares, 0, sizeof(b->Squares));
+
+    // PAWN Possible Moves
+    for (int y = 2; y <= 5; y++)
+        for (int x = 0; x < 8; x++)
+          b->Squares[y][x].possible[y <= 3 ? BLACK_TEAM : WHITE_TEAM]++;
+
+    // ROOK Possible Moves
+    int rookCols[] = {0, 2, 5, 7};
+    for (int i = 0 ; i < 4; i++){
+        b->Squares[2][rookCols[i]].possible[BLACK_TEAM]++;
+        b->Squares[5][rookCols[i]].possible[WHITE_TEAM]++;
     }
 
     // Black Set
