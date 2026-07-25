@@ -33,6 +33,11 @@
 #include "chess.h"
 #define PORT "6969"
 
+SOCKET startServer(const char *address, const char *port);
+SOCKET acceptHostConnection(SOCKET hostSock, bool (*on_tick)(void *user_data), void *user_data);
+SOCKET initClient(const char *address, const char *port);
+void closeSocket(SOCKET *sock);
+
 SOCKET serverSocket(const char *address, const char *port);
 SOCKET connectHost(const char *address, const char *port);
 void nonblock(SOCKET fd);

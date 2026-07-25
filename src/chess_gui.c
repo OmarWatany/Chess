@@ -23,11 +23,21 @@ Texture2D whiteShapeText[KING + 1] = {0};
 Texture2D blackShapeText[KING + 1] = {0};
 Color colors[3];
 TEAM PLAYER = WHITE_TEAM;
-
 SOCKET host = -1, peerSocket = -1;
 bool online = true;
 
-fd_set default_set;
+bool LoadingWindow() {
+    char *waiting = "Waiting for connection...";
+    int fontSize = 40;
+    Vector2 loadingDim = MeasureTextEx(GetFontDefault(), waiting, fontSize, 0);
+
+    ClearBackground(WHITE);
+    BeginDrawing();
+    DrawText(waiting, (BOARD_WIDTH - loadingDim.x) / 2.f, (BOARD_WIDTH - loadingDim.y) / 2.f, fontSize, BLACK);
+    EndDrawing();
+
+    return true;
+}
 
 void mainMenu() {
     bool start = true;
@@ -53,7 +63,6 @@ void mainMenu() {
     if (start && online) onlineGame();
 }
 
-// NOTE: I can take main as common factor
 int main() {
     SetTraceLogLevel(LOG_NONE);
     InitWindow(BOARD_WIDTH, BOARD_HEIGHT + INFOBAR_HEIGHT, "Chess");
@@ -68,48 +77,31 @@ int main() {
     return 0;
 }
 
-int hostListen() {
-    host = serverSocket("localhost", PORT);
-    listen(host, 2);
-    char *waiting = "Waiting for connection...";
-    int fontSize = 40;
-    Vector2 loadingDim = MeasureTextEx(GetFontDefault(), waiting, fontSize, 0);
-    bool loading = true;
-    while (!ISVALIDSOCKET(peerSocket)) {
-        if (loading) {
-            ClearBackground(WHITE);
-            BeginDrawing();
-            DrawText(waiting, (BOARD_WIDTH - loadingDim.x) / 2.f, (BOARD_WIDTH - loadingDim.y) / 2.f, fontSize, BLACK);
-            EndDrawing();
-        }
-        if (IsKeyReleased(KEY_Q)) {
-            close(host);
-            return EXIT_FAILURE;
-        }
-        struct sockaddr_storage clientAddrress;
-        socklen_t clientLen = sizeof(clientAddrress);
-        peerSocket = accept(host, (struct sockaddr *)&clientAddrress, &clientLen);
-        if (!ISVALIDSOCKET(peerSocket)) continue;
-
-        nonblock(peerSocket);
-        loading = false;
-        char addressBuffer[100];
-        char portNumber[8];
-        getnameinfo((struct sockaddr *)&clientAddrress, clientLen, addressBuffer, sizeof(addressBuffer), portNumber,
-                    sizeof(portNumber), NI_NUMERICHOST);
-        printf("Client %s:%s connected\n", addressBuffer, portNumber);
+static bool onHostListenTick(void *user_data) {
+    (void)user_data;
+    LoadingWindow();
+    if (IsKeyReleased(KEY_Q)) {
+        return false;
     }
-    FD_ZERO(&default_set);
-    FD_SET(peerSocket, &default_set);
+    return true;
+}
+
+int hostListen() {
+    host = startServer("localhost", PORT);
+    if (!ISVALIDSOCKET(host)) return EXIT_FAILURE;
+
+    peerSocket = acceptHostConnection(host, onHostListenTick, NULL);
+    if (!ISVALIDSOCKET(peerSocket)) {
+        closeSocket(&host);
+        return EXIT_FAILURE;
+    }
     return EXIT_SUCCESS;
 }
 
 void clientInit() {
     PLAYER = BLACK_TEAM;
     mirrorBoard();
-    peerSocket = connectHost(0, PORT);
-    FD_ZERO(&default_set);
-    FD_SET(peerSocket, &default_set);
+    peerSocket = initClient("localhost", PORT);
 }
 
 static bool handleLocalFrame(void *data) {
@@ -182,14 +174,8 @@ void onlineGame() {
     Message moveMsg = {};
     runGameLoop(handleOnlineFrame, &moveMsg);
 
-    if (host >= 0) {
-        close(host);
-        host = -1;
-    }
-    if (peerSocket >= 0) {
-        close(peerSocket);
-        peerSocket = -1;
-    }
+    closeSocket(&host);
+    closeSocket(&peerSocket);
 }
 
 Vector2 getSldrPos(Position arrPos) {

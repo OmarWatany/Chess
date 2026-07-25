@@ -9,6 +9,8 @@
 #include <string.h>
 #include <sys/select.h>
 
+fd_set default_set;
+
 int sendMessage(SOCKET sock, Message *msg) {
     fd_set writeMask = default_set;
     const int MsgSize = sizeof(*msg);
@@ -29,7 +31,10 @@ Message getMessage(SOCKET sock) {
     fd_set readMask = default_set;
     const int MsgSize = sizeof(Message);
     int sum = 0, bytes = 0;
-    struct timeval selectTimeOut = {.tv_sec = 0,.tv_usec = 0, };
+    struct timeval selectTimeOut = {
+        .tv_sec = 0,
+        .tv_usec = 0,
+    };
     select(sock + 1, &readMask, 0, 0, &selectTimeOut);
     if (!FD_ISSET(sock, &readMask)) return msg;
     do {
@@ -87,4 +92,59 @@ SOCKET connectHost(const char *address, const char *port) {
     nonblock(servSock);
     freeaddrinfo(addr);
     return servSock;
+}
+
+SOCKET startServer(const char *address, const char *port) {
+    SOCKET hostSock = serverSocket(address ? address : "localhost", port ? port : PORT);
+    if (!ISVALIDSOCKET(hostSock)) return -1;
+    if (listen(hostSock, 2) < 0) {
+        CLOSESOCKET(hostSock);
+        return -1;
+    }
+    return hostSock;
+}
+
+SOCKET acceptHostConnection(SOCKET hostSock, bool (*on_tick)(void *user_data), void *user_data) {
+    if (!ISVALIDSOCKET(hostSock)) return -1;
+
+    struct sockaddr_storage clientAddress;
+    socklen_t clientLen = sizeof(clientAddress);
+    SOCKET peer = -1;
+
+    while (!ISVALIDSOCKET(peer)) {
+        if (on_tick && !on_tick(user_data)) {
+            return -1;
+        }
+
+        peer = accept(hostSock, (struct sockaddr *)&clientAddress, &clientLen);
+        if (!ISVALIDSOCKET(peer)) continue;
+    }
+
+    nonblock(peer);
+
+    char addressBuffer[100];
+    char portNumber[8];
+    getnameinfo((struct sockaddr *)&clientAddress, clientLen, addressBuffer, sizeof(addressBuffer), portNumber,
+                sizeof(portNumber), NI_NUMERICHOST);
+    printf("Client %s:%s connected\n", addressBuffer, portNumber);
+
+    FD_ZERO(&default_set);
+    FD_SET(peer, &default_set);
+    return peer;
+}
+
+SOCKET initClient(const char *address, const char *port) {
+    SOCKET peer = connectHost(address ? address : "localhost", port ? port : PORT);
+    if (ISVALIDSOCKET(peer)) {
+        FD_ZERO(&default_set);
+        FD_SET(peer, &default_set);
+    }
+    return peer;
+}
+
+void closeSocket(SOCKET *sock) {
+    if (sock && ISVALIDSOCKET(*sock)) {
+        CLOSESOCKET(*sock);
+        *sock = -1;
+    }
 }
