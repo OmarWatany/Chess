@@ -16,9 +16,7 @@ int moveSldr(Position from, Position to) {
     Square *fromSq = chooseSquare(from);
     Square *nextSq = chooseSquare(to);
 
-    if (nextSq->sldr) {
-        killEnemey(nextSq->sldr);
-    }
+    if (nextSq->sldr) killEnemey(nextSq->sldr);
     if (fromSq->sldr->type == PAWN) {
         // reset soldiers' state
         for (int i = 0; i < 8; i++) {
@@ -33,7 +31,7 @@ int moveSldr(Position from, Position to) {
 
         if (fromSq->sldr->otherdt->NMOVES < MORE_THAN_ONE) (fromSq->sldr->otherdt->NMOVES)++;
 
-        Soldier* enPassantSldr = ctx.board.Squares[fromSq->sldr->arrPos.row][to.col].sldr;
+        Soldier *enPassantSldr = ctx.board.Squares[fromSq->sldr->arrPos.row][to.col].sldr;
         if (to.row == 2 && to.col != fromSq->sldr->arrPos.col && enPassantSldr) {
             killEnemey(ctx.board.Squares[fromSq->sldr->arrPos.row][to.col].sldr);
             ctx.board.Squares[fromSq->sldr->arrPos.row][to.col].sldr = NULL;
@@ -48,45 +46,43 @@ int moveSldr(Position from, Position to) {
     return 0;
 }
 
-int moveFrom(Position pos) {
+MOVEMENT_STATUS moveFrom(Position pos) {
     ctx.fromPos = pos;
     Square *fromSq = chooseSquare(pos);
     // If chose empty square or non active team's soldier
-    if (!occupied(fromSq) || fromSq->sldr->team_set->teamColor != ctx.ACTIVE)
-        return 0;
+    if (!occupied(fromSq) || fromSq->sldr->team_set->teamColor != ctx.ACTIVE) return MOVE_INVALID;
 
     ctx.availableSqs = calcNextMove(fromSq);
     if (alist_empty(&ctx.availableSqs)) {
         colorBoardSquares();
-        return 0;
+        return MOVE_INVALID;
     }
 
     ctx.movementChange = TO;
-    return 1;
+    return MOVE_VALID;
 }
 
-int moveTo(Position to) {
+MOVEMENT_STATUS moveTo(Position to) {
     Square *next = chooseSquare(to);
     if (occupied(next) && next->sldr->team_set->teamColor == ctx.ACTIVE) {
         resetMovement();
         moveFrom(to);
-        return 0;
+        return MOVE_MODE_CHANGE;
     }
-    if (!isAvailable(next)) return 0;
+    if (!isAvailable(next)) return MOVE_INVALID;
 
     Soldier *fromSldr = chooseSquare(ctx.fromPos)->sldr;
     if (fromSldr->type != KING)
         for (size_t i = 0; i < alist_size(&ctx.availableSqs); i++)
-        alist_sq_at(&ctx.availableSqs, i)->possible[fromSldr->team_set->teamColor]--;
+            alist_sq_at(&ctx.availableSqs, i)->possible[fromSldr->team_set->teamColor]--;
 
     moveSldr(ctx.fromPos, to);
 
     ctx.availableSqs = calcNextMove(next);
-    if (fromSldr->type != KING)
-        markPossibles(fromSldr->team_set->teamColor);
+    if (fromSldr->type != KING) markPossibles(fromSldr->team_set->teamColor);
 
     resetMovement();
-    return 1;
+    return MOVE_VALID;
 }
 
 void killEnemey(Soldier *sldr) {
@@ -275,12 +271,10 @@ alist_t calcNextMoveKing(Square *fsq) {
     Square *n = NULL;
     for (int c = -1; c <= 1; c++) {
         for (int r = -1; r <= 1; r++) {
-            if(!inBoundaries(row + r) || !inBoundaries(colmn + c))
-                continue;
+            if (!inBoundaries(row + r) || !inBoundaries(colmn + c)) continue;
             n = &(ctx.board.Squares[row + r][colmn + c]);
             if (n->possible[fsq->sldr->team_set->teamColor == BLACK_TEAM ? WHITE_TEAM : BLACK_TEAM] > 0) continue;
-            if (!occupied(n) || isEnemy(fsq, n))
-                alist_push_pos(&nextSqs, (Position){.row = row + r, .col = colmn + c});
+            if (!occupied(n) || isEnemy(fsq, n)) alist_push_pos(&nextSqs, (Position){.row = row + r, .col = colmn + c});
         }
     }
     return nextSqs;

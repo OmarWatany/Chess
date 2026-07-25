@@ -28,6 +28,7 @@ typedef enum { PAWN = 1, KNIGHT, BISHOP, ROOK, QUEEN, KING } SOLDIER_TYPE;
 typedef enum { FROM, TO } CHANGE;
 typedef enum { ZERO, ONE, MORE_THAN_ONE } NM_OF_MOVES;
 typedef enum { MSG_BOGUS = 1, MSG_MOVE, PEER_CLOSED } MESSAGE_KIND;
+typedef enum { MOVE_INVALID, MOVE_VALID, MOVE_MODE_CHANGE } MOVEMENT_STATUS;
 
 typedef struct Set_t Set_t;
 
@@ -106,8 +107,8 @@ Square *chooseSquare(Position pos);
 Position choosePos(CHANGE change);
 Soldier *selectSldr(Position SqPos);
 int moveSldr(Position from, Position to);
-int moveFrom(Position pos);
-int moveTo(Position to);
+MOVEMENT_STATUS moveFrom(Position pos);
+MOVEMENT_STATUS moveTo(Position to);
 bool isAvailable(Square *sq);
 bool isSecPassed(time_t previous, time_t seconds);
 void changeActive();

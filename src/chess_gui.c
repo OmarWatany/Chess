@@ -22,7 +22,7 @@ Texture2D blackShapeText[KING + 1] = {0};
 Color colors[3];
 TEAM PLAYER = WHITE_TEAM;
 
-SOCKET host = -1, client = -1;
+SOCKET host = -1, peerSocket = -1;
 bool online = true;
 
 fd_set default_set;
@@ -73,7 +73,7 @@ int hostListen() {
     int fontSize = 40;
     Vector2 loadingDim = MeasureTextEx(GetFontDefault(), waiting, fontSize, 0);
     bool loading = true;
-    while (!ISVALIDSOCKET(client)) {
+    while (!ISVALIDSOCKET(peerSocket)) {
         if (loading) {
             ClearBackground(WHITE);
             BeginDrawing();
@@ -86,10 +86,10 @@ int hostListen() {
         }
         struct sockaddr_storage clientAddrress;
         socklen_t clientLen = sizeof(clientAddrress);
-        client = accept(host, (struct sockaddr *)&clientAddrress, &clientLen);
-        if (!ISVALIDSOCKET(client)) continue;
+        peerSocket = accept(host, (struct sockaddr *)&clientAddrress, &clientLen);
+        if (!ISVALIDSOCKET(peerSocket )) continue;
 
-        nonblock(client);
+        nonblock(peerSocket);
         loading = false;
         char addressBuffer[100];
         char portNumber[8];
@@ -98,20 +98,19 @@ int hostListen() {
         printf("Client %s:%s connected\n", addressBuffer, portNumber);
     }
     FD_ZERO(&default_set);
-    FD_SET(client, &default_set);
+    FD_SET(peerSocket, &default_set);
     return EXIT_SUCCESS;
 }
 
 void clientInit() {
     PLAYER = BLACK_TEAM;
     mirrorBoard();
-    host = connectHost(0, PORT);
+    peerSocket = connectHost(0, PORT);
     FD_ZERO(&default_set);
-    FD_SET(host, &default_set);
+    FD_SET(peerSocket, &default_set);
 }
 
 void onlineGame() {
-    int valid;
     globalTime = time(0);
     Message moveMsg = {0};
 
@@ -120,13 +119,12 @@ void onlineGame() {
         BeginDrawing();
         drawBoard();
         EndDrawing();
-        valid = 0;
 
         if (isSecPassed(globalTime, 1)) incTimer();
         if (IsKeyReleased(KEY_C)) resetMovement();
-        if (IsKeyReleased(KEY_Q) || host < 0) goto FUNC_END;
+        if (IsKeyReleased(KEY_Q) || peerSocket < 0) goto FUNC_END;
 
-        moveMsg = getMessage(PLAYER == WHITE_TEAM ? client : host);
+        moveMsg = getMessage(peerSocket);
         if (msgVerify(&moveMsg)) moveMsg.kind = MSG_BOGUS;
         if (moveMsg.kind == PEER_CLOSED) goto FUNC_END;
 
@@ -137,15 +135,9 @@ void onlineGame() {
                 // TODO: resend Message
                 break;
             case MSG_MOVE:
-                // temporary solution
                 mirrorBoard();
-                valid = moveFrom(moveMsg.from);
-                valid = moveTo(moveMsg.to);
-                if (valid == 1) {
-                    Square *nextSq = chooseSquare(moveMsg.to);
-                    Soldier *sldr = nextSq->sldr;
-                    sldr->arrPos = moveMsg.to;
-                }
+                moveFrom(moveMsg.from);
+                moveTo(moveMsg.to);
                 mirrorBoard();
             default:
                 break;
@@ -154,29 +146,24 @@ void onlineGame() {
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && ctx.ACTIVE == PLAYER) {
             Position tArrPos = getArrPos(GetMousePosition());
             if (ctx.movementChange == FROM) {
-                valid = moveFrom(tArrPos);
-            } else if (ctx.movementChange == TO && (valid = moveTo(tArrPos)) == 1) {
+                moveFrom(tArrPos);
+            } else if (moveTo(tArrPos) == MOVE_VALID) {
+                moveMsg.from = ctx.fromPos;
                 moveMsg.to = tArrPos;
-                Square *nextSq = chooseSquare(tArrPos);
-                Soldier *sldr = nextSq->sldr;
-                sldr->arrPos = tArrPos;
                 msgSetup(&moveMsg);
-                sendMessage(PLAYER == WHITE_TEAM ? client : host, &moveMsg);
+                sendMessage(peerSocket, &moveMsg);
             }
-            if ((ctx.movementChange == TO && valid == 2) || ctx.movementChange == FROM) moveMsg.from = tArrPos;
         }
     }
 FUNC_END:
     if (host >= 0) close(host);
-    if (client >= 0) close(client);
+    if (peerSocket >= 0) close(peerSocket);
 }
 
 void game() {
     globalTime = time(0);
 
-    int valid;
     while (!WindowShouldClose()) {
-        valid = 0;
         if (isSecPassed(globalTime, 1)) incTimer();
 
         if (IsKeyReleased(KEY_C)) {
@@ -187,8 +174,8 @@ void game() {
         if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
             Position tArrPos = getArrPos(GetMousePosition());
             if (ctx.movementChange == FROM) {
-                valid = moveFrom(tArrPos);
-            } else if (ctx.movementChange == TO && (valid = moveTo(tArrPos))) {
+                moveFrom(tArrPos);
+            } else if (moveTo(tArrPos) == MOVE_VALID) {
                 mirrorBoard();
             }
         }
