@@ -15,6 +15,8 @@ void clientInit();
 static inline Position getArrPos(Vector2 from);
 static inline Vector2 getSldrPos(Position arrPos);
 
+typedef bool (*GameHandler)(void *data);
+
 // GUI client's data
 Position sldrSize;
 Texture2D whiteShapeText[KING + 1] = {0};
@@ -87,7 +89,7 @@ int hostListen() {
         struct sockaddr_storage clientAddrress;
         socklen_t clientLen = sizeof(clientAddrress);
         peerSocket = accept(host, (struct sockaddr *)&clientAddrress, &clientLen);
-        if (!ISVALIDSOCKET(peerSocket )) continue;
+        if (!ISVALIDSOCKET(peerSocket)) continue;
 
         nonblock(peerSocket);
         loading = false;
@@ -110,80 +112,83 @@ void clientInit() {
     FD_SET(peerSocket, &default_set);
 }
 
-void onlineGame() {
-    globalTime = time(0);
-    Message moveMsg = {0};
+static bool handleLocalFrame(void *data) {
+    (void)data;
 
-    while (!WindowShouldClose()) {
-        ClearBackground(BLACK);
-        BeginDrawing();
-        drawBoard();
-        EndDrawing();
-
-        if (isSecPassed(globalTime, 1)) incTimer();
-        if (IsKeyReleased(KEY_C)) resetMovement();
-        if (IsKeyReleased(KEY_Q) || peerSocket < 0) goto FUNC_END;
-
-        moveMsg = getMessage(peerSocket);
-        if (msgVerify(&moveMsg)) moveMsg.kind = MSG_BOGUS;
-        if (moveMsg.kind == PEER_CLOSED) goto FUNC_END;
-
-        if (ctx.ACTIVE != PLAYER) {
-            switch (moveMsg.kind) {
-            case MSG_BOGUS:
-                printf("MSG_BOGUS\n");
-                // TODO: resend Message
-                break;
-            case MSG_MOVE:
-                mirrorBoard();
-                moveFrom(moveMsg.from);
-                moveTo(moveMsg.to);
-                mirrorBoard();
-            default:
-                break;
-            }
-        }
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && ctx.ACTIVE == PLAYER) {
-            Position tArrPos = getArrPos(GetMousePosition());
-            if (ctx.movementChange == FROM) {
-                moveFrom(tArrPos);
-            } else if (moveTo(tArrPos) == MOVE_VALID) {
-                moveMsg.from = ctx.fromPos;
-                moveMsg.to = tArrPos;
-                msgSetup(&moveMsg);
-                sendMessage(peerSocket, &moveMsg);
-            }
+    if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+        Position mousePos = getArrPos(GetMousePosition());
+        if (ctx.movementChange == FROM) {
+            moveFrom(mousePos);
+        } else if (moveTo(mousePos) == MOVE_VALID) {
+            mirrorBoard();
         }
     }
-FUNC_END:
-    if (host >= 0) close(host);
-    if (peerSocket >= 0) close(peerSocket);
+    return true;
+}
+
+static bool handleOnlineFrame(void *data) {
+    Message *moveMsg = (Message *)data;
+    if (peerSocket < 0) return false;
+    // 1. Receive incoming move from remote peer
+    if (ctx.ACTIVE != PLAYER) {
+        *moveMsg = getMessage(peerSocket);
+        if (msgVerify(moveMsg)) moveMsg->kind = MSG_BOGUS;
+        if (moveMsg->kind == PEER_CLOSED) return false;
+        if (moveMsg->kind == MSG_MOVE) {
+            mirrorBoard();
+            moveFrom(moveMsg->from);
+            moveTo(moveMsg->to);
+            mirrorBoard();
+        }
+    }
+
+    // 2. Process local player input
+    if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && ctx.ACTIVE == PLAYER) {
+        Position mousePos = getArrPos(GetMousePosition());
+        if (ctx.movementChange == FROM) {
+            moveFrom(mousePos);
+        } else if (moveTo(mousePos) == MOVE_VALID) {
+            moveMsg->from = ctx.fromPos;
+            moveMsg->to = mousePos;
+            msgSetup(moveMsg);
+            sendMessage(peerSocket, moveMsg);
+        }
+    }
+    return true;
+}
+
+static void runGameLoop(GameHandler handler, void *data) {
+    globalTime = time(0);
+
+    while (!WindowShouldClose()) {
+        if (isSecPassed(globalTime, 1)) incTimer();
+        if (IsKeyReleased(KEY_C)) resetMovement();
+        if (IsKeyReleased(KEY_Q)) break;
+
+        if (handler(data)) {
+            ClearBackground(BLACK);
+            BeginDrawing();
+            drawBoard();
+            EndDrawing();
+        }
+    }
 }
 
 void game() {
-    globalTime = time(0);
+    runGameLoop(handleLocalFrame, NULL);
+}
 
-    while (!WindowShouldClose()) {
-        if (isSecPassed(globalTime, 1)) incTimer();
+void onlineGame() {
+    Message moveMsg = {};
+    runGameLoop(handleOnlineFrame, &moveMsg);
 
-        if (IsKeyReleased(KEY_C)) {
-            resetMovement();
-        } else if (IsKeyReleased(KEY_Q)) {
-            break;
-        }
-        if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
-            Position tArrPos = getArrPos(GetMousePosition());
-            if (ctx.movementChange == FROM) {
-                moveFrom(tArrPos);
-            } else if (moveTo(tArrPos) == MOVE_VALID) {
-                mirrorBoard();
-            }
-        }
-
-        ClearBackground(BLACK);
-        BeginDrawing();
-        drawBoard();
-        EndDrawing();
+    if (host >= 0) {
+        close(host);
+        host = -1;
+    }
+    if (peerSocket >= 0) {
+        close(peerSocket);
+        peerSocket = -1;
     }
 }
 

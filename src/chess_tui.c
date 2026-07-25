@@ -11,7 +11,14 @@ void debug();
 Context *localCtx = &ctx;
 
 char *colors[3];
-char *shapes[KING + 1];
+char *shapes[KING + 1] = {
+    [PAWN] = "PW",
+    [KNIGHT] = "KN",
+    [BISHOP] = "BI",
+    [ROOK] = "RK",
+    [QUEEN] = "QN",
+    [KING] = "KG",
+};
 
 void erroredEnd() {
     destroyData();
@@ -69,7 +76,6 @@ void mainMenu() {
 int main() {
     initColors(colors);
     initGameData();
-    initShapes();
     // initgdata();
 
     mainMenu();
@@ -253,9 +259,6 @@ void initColors(char *colors[3]) {
 }
 
 void destroyData() {
-    for (int i = PAWN; i < KING + 1; i++)
-        free(shapes[i]);
-
     for (int i = 0; i < 4; i++)
         free(colors[i]);
 

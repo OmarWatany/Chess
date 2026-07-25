@@ -29,7 +29,7 @@ Message getMessage(SOCKET sock) {
     fd_set readMask = default_set;
     const int MsgSize = sizeof(Message);
     int sum = 0, bytes = 0;
-    struct timeval selectTimeOut = {.tv_usec = 100000};
+    struct timeval selectTimeOut = {.tv_sec = 0,.tv_usec = 0, };
     select(sock + 1, &readMask, 0, 0, &selectTimeOut);
     if (!FD_ISSET(sock, &readMask)) return msg;
     do {
