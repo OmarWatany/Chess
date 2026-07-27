@@ -151,6 +151,17 @@ void game() {
     while (RUNING_STAT) {
         valid = 0;
         drawBoard();
+
+        if (ctx.gameResult != GAME_ONGOING) {
+            if (ctx.gameResult == GAME_CHECKMATE) {
+                const char *winner = (ctx.ACTIVE == WHITE_TEAM) ? "BLACK" : "WHITE";
+                printf("CHECKMATE! %s wins!\n", winner);
+            } else {
+                printf("STALEMATE! It's a draw!\n");
+            }
+            break;
+        }
+
         printCommands();
         if (!scanf(" %s", data)) erroredEnd();
         Position tArrPos;
@@ -165,6 +176,7 @@ void game() {
                     valid = moveTo(tArrPos);
                     if (valid == 1) {
                         mirrorBoard();
+                        ctx.gameResult = checkGameState(ctx.ACTIVE);
                     }
                 }
             }

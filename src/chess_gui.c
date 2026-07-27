@@ -4,7 +4,6 @@
 #include "gringbuffer.h"
 #include "networking.h"
 #include "raylib.h"
-#include <stdio.h>
 #include <time.h>
 
 void initTextures();
@@ -106,6 +105,7 @@ void clientInit() {
 
 static bool handleLocalFrame(void *data) {
     (void)data;
+    if (ctx.gameResult != GAME_ONGOING) return true;
 
     if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
         Position mousePos = getArrPos(GetMousePosition());
@@ -113,6 +113,7 @@ static bool handleLocalFrame(void *data) {
             moveFrom(mousePos);
         } else if (moveTo(mousePos) == MOVE_VALID) {
             mirrorBoard();
+            ctx.gameResult = checkGameState(ctx.ACTIVE);
         }
     }
     return true;
@@ -121,6 +122,8 @@ static bool handleLocalFrame(void *data) {
 static bool handleOnlineFrame(void *data) {
     Message *moveMsg = (Message *)data;
     if (peerSocket < 0) return false;
+    if (ctx.gameResult != GAME_ONGOING) return true;
+
     // 1. Receive incoming move from remote peer
     if (ctx.ACTIVE != PLAYER) {
         *moveMsg = getMessage(peerSocket);
@@ -131,6 +134,8 @@ static bool handleOnlineFrame(void *data) {
             moveFrom(moveMsg->from);
             moveTo(moveMsg->to);
             mirrorBoard();
+            // Board is in PLAYER's perspective, ctx.ACTIVE == PLAYER
+            ctx.gameResult = checkGameState(ctx.ACTIVE);
         }
     }
 
@@ -144,9 +149,37 @@ static bool handleOnlineFrame(void *data) {
             moveMsg->to = mousePos;
             msgSetup(moveMsg);
             sendMessage(peerSocket, moveMsg);
+            // Check opponent: mirror to their perspective, check, mirror back
+            mirrorBoard();
+            ctx.gameResult = checkGameState(ctx.ACTIVE);
+            mirrorBoard();
         }
     }
     return true;
+}
+
+static void drawGameOver() {
+    DrawRectangle(0, INFOBAR_HEIGHT, BOARD_WIDTH, BOARD_HEIGHT, (Color){0, 0, 0, 160});
+
+    int fontSize = 50;
+    const char *text;
+    if (ctx.gameResult == GAME_CHECKMATE) {
+        // The loser is ctx.ACTIVE (the team that can't move), winner is the other
+        const char *winner = (ctx.ACTIVE == WHITE_TEAM) ? "BLACK" : "WHITE";
+        text = TextFormat("CHECKMATE - %s WINS!", winner);
+    } else {
+        text = "STALEMATE - DRAW!";
+    }
+
+    Vector2 textDim = MeasureTextEx(GetFontDefault(), text, fontSize, 0);
+    float tx = (BOARD_WIDTH - textDim.x) / 2.f;
+    float ty = INFOBAR_HEIGHT + (BOARD_HEIGHT - textDim.y) / 2.f;
+    DrawText(text, tx, ty, fontSize, WHITE);
+
+    const char *sub = "Press Q to quit";
+    int subSize = 25;
+    Vector2 subDim = MeasureTextEx(GetFontDefault(), sub, subSize, 0);
+    DrawText(sub, (BOARD_WIDTH - subDim.x) / 2.f, ty + textDim.y + 20, subSize, LIGHTGRAY);
 }
 
 static void runGameLoop(GameHandler handler, void *data) {
@@ -161,6 +194,7 @@ static void runGameLoop(GameHandler handler, void *data) {
             ClearBackground(BLACK);
             BeginDrawing();
             drawBoard();
+            if (ctx.gameResult != GAME_ONGOING) drawGameOver();
             EndDrawing();
         }
     }

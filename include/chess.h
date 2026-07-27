@@ -29,6 +29,7 @@ typedef enum { FROM, TO } CHANGE;
 typedef enum { ZERO, ONE, MORE_THAN_ONE } NM_OF_MOVES;
 typedef enum { MSG_BOGUS = 1, MSG_MOVE, PEER_CLOSED } MESSAGE_KIND;
 typedef enum { MOVE_INVALID, MOVE_VALID, MOVE_MODE_CHANGE } MOVEMENT_STATUS;
+typedef enum { GAME_ONGOING, GAME_CHECKMATE, GAME_STALEMATE } GAME_RESULT;
 
 typedef struct Set_t Set_t;
 
@@ -66,7 +67,6 @@ struct Set_t {
 
 typedef struct {
     Soldier *sldr;
-    char possible[2];
 } Square;
 
 typedef struct {
@@ -80,6 +80,7 @@ typedef struct {
     CHANGE movementChange;
     Board board;
     Position fromPos;
+    GAME_RESULT gameResult;
 } Context;
 
 typedef struct {
@@ -130,6 +131,9 @@ void msgSetup(Message *msg);
 int msgVerify(Message *msg);
 void colorBoardSquares();
 bool inBoundaries(int);
+bool isKingInCheck(TEAM team);
+bool isSquareAttacked(Position target, TEAM byTeam);
+GAME_RESULT checkGameState(TEAM team);
 void drawWhileWhite();
 void drawWhileBlack();
 void initGameData();
